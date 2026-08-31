@@ -89,19 +89,19 @@
                 <div class="form-row">
                     <div class="form-group" id="fieldGrossiste">
                         <label class="form-label">Grossiste / Distributeur *</label>
-                        <select name="grossiste_id" id="selectGrossiste" class="form-select">
+                        <select name="grossiste_id" id="selectGrossiste" class="form-select" onchange="updateAllLignesPrix()">
                             <option value="">-- Sélectionner un grossiste --</option>
                             {% for g in grossistes %}
-                                <option value="{{ g.id }}">{{ g.raisonSociale }} ({{ g.code }})</option>
+                                <option value="{{ g.id }}">{{ g.raisonSociale }} ({{ g.code }}) - Région: {{ g.region ? g.region.nom : 'Non défini' }}</option>
                             {% endfor %}
                         </select>
                     </div>
                     <div class="form-group" id="fieldDetaillant" style="display: none;">
                         <label class="form-label">Détaillant / Point de Vente *</label>
-                        <select name="detailant_id" id="selectDetaillant" class="form-select">
+                        <select name="detailant_id" id="selectDetaillant" class="form-select" onchange="updateAllLignesPrix()">
                             <option value="">-- Sélectionner un détaillant --</option>
                             {% for d in detailants %}
-                                <option value="{{ d.id }}">{{ d.nom }} ({{ d.code }})</option>
+                                <option value="{{ d.id }}">{{ d.nom }} ({{ d.code }}) - Région: {{ d.region ? d.region.nom : 'Non défini' }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -125,10 +125,10 @@
 
                     <div id="lignesCommandeContainer">
                         <!-- Ligne 1 par défaut -->
-                        <div class="ligne-commande" style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 10px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 10px; border: 1px solid var(--border-subtle);">
+                        <div class="ligne-commande" style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 10px; padding: 12px; background: var(--bg-card-subtle); border-radius: 10px; border: 1px solid var(--border-subtle);">
                             <div style="flex: 2;">
                                 <label class="form-label" style="font-size: 11px;">Produit *</label>
-                                <select name="produit_ids[]" class="form-select" required>
+                                <select name="produit_ids[]" class="form-select select-produit" required onchange="autoFillPrix(this)">
                                     <option value="">-- Produit --</option>
                                     {% for p in produits %}
                                         <option value="{{ p.id }}">{{ p.nom }} ({{ p.code }})</option>
@@ -137,22 +137,25 @@
                             </div>
                             <div style="flex: 1.5;">
                                 <label class="form-label" style="font-size: 11px;">Conditionnement</label>
-                                <select name="conditionnement_ids[]" class="form-select">
+                                <select name="conditionnement_ids[]" class="form-select select-cond" onchange="autoFillPrix(this)">
                                     <option value="">-- Unité --</option>
                                     {% for c in conditionnements %}
-                                        <option value="{{ c.id }}">{{ c.libelle }} ({{ c.produit ? c.produit.nom : '' }})</option>
+                                        <option value="{{ c.id }}">{{ c.libelle }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
                             <div style="flex: 1;">
                                 <label class="form-label" style="font-size: 11px;">Quantité *</label>
-                                <input type="number" step="0.001" name="quantites[]" class="form-control" placeholder="Qté" required oninput="calculerMontantLigne(this)">
+                                <input type="number" step="0.001" name="quantites[]" class="form-control input-qte" placeholder="Qté" required oninput="calculerMontantLigne(this)">
                             </div>
-                            <div style="flex: 1;">
-                                <label class="form-label" style="font-size: 11px;">Prix Unitaire ($) *</label>
-                                <input type="number" step="0.01" name="prix_unitaires[]" class="form-control" placeholder="P.U." required oninput="calculerMontantLigne(this)">
+                            <div style="flex: 1.2;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <label class="form-label" style="font-size: 11px;">Prix Unit. ($) *</label>
+                                    <span class="badge-source-prix" style="font-size: 9px; color: var(--text-gold);"></span>
+                                </div>
+                                <input type="number" step="0.01" name="prix_unitaires[]" class="form-control input-pu" placeholder="P.U." required oninput="calculerMontantLigne(this)">
                             </div>
-                            <div style="flex: 0.8;">
+                            <div style="flex: 0.9;">
                                 <label class="form-label" style="font-size: 11px;">Sous-total</label>
                                 <input type="text" class="form-control sous-total-ligne" value="0.00 $" disabled style="font-weight: 700; color: var(--text-gold);">
                             </div>
@@ -178,7 +181,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" onclick="closeModal('modalAddCommande')" class="btn btn-outline">Annuler</button>
-                <button type="submit" class="btn btn-gold"><i class="fa-solid fa-paper-plane"></i> Soumettre la Commande</button>
+                <button type="submit" class="btn btn-gold"><i class="fa-solid fa-cart-arrow-down"></i> Créer la Commande</button>
             </div>
         </form>
     </div>
@@ -186,14 +189,14 @@
 
 <!-- Commandes Modals (Edit & Cancel — Rendered Outside Table) -->
 {% for cmd in commandes %}
-{% if cmd.statut in ['SOUMISE', 'BROUILLON'] %}
+{% if cmd.statut == 'SOUMISE' %}
 <div id="modalEditCommande{{ cmd.id }}" class="modal-backdrop">
     <div class="modal-content">
         <div class="modal-header">
-            <div class="modal-title"><i class="fa-solid fa-pen-to-square text-gold"></i> Modifier Commande — {{ cmd.numero }}</div>
+            <div class="modal-title"><i class="fa-solid fa-pen-to-square text-gold"></i> Modifier Commande {{ cmd.numero }}</div>
             <button onclick="closeModal('modalEditCommande{{ cmd.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <form method="post" action="{{ path('app_commande_modifier', {id: cmd.id}) }}">
+        <form method="post" action="{{ path('app_commande_edit', {id: cmd.id}) }}">
             <div class="modal-body">
                 <div class="form-group">
                     <label class="form-label">Client</label>
@@ -245,6 +248,51 @@ function toggleClientFields() {
     var type = document.getElementById('selectTypeCommande').value;
     document.getElementById('fieldGrossiste').style.display = (type === 'GROSSISTE') ? 'block' : 'none';
     document.getElementById('fieldDetaillant').style.display = (type === 'DETAILLANT') ? 'block' : 'none';
+    updateAllLignesPrix();
+}
+
+function autoFillPrix(el) {
+    var row = el.closest('.ligne-commande');
+    var produitId = row.querySelector('.select-produit').value;
+    var condId = row.querySelector('.select-cond').value;
+    var typeCommande = document.getElementById('selectTypeCommande').value;
+    var grossisteId = document.getElementById('selectGrossiste').value;
+    var detailantId = document.getElementById('selectDetaillant').value;
+
+    if (!produitId || !condId) return;
+
+    var url = '{{ path("api_tarif_prix_applicable") }}?produit_id=' + produitId + '&conditionnement_id=' + condId + '&type_client=' + typeCommande;
+    if (typeCommande === 'GROSSISTE' && grossisteId) {
+        url += '&grossiste_id=' + grossisteId;
+    } else if (typeCommande === 'DETAILLANT' && detailantId) {
+        url += '&detailant_id=' + detailantId;
+    }
+
+    fetch(url)
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (data.prix > 0) {
+                var puInput = row.querySelector('.input-pu');
+                puInput.value = data.prix;
+                var badge = row.querySelector('.badge-source-prix');
+                if (badge) {
+                    badge.textContent = data.zone ? data.zone : (data.region ? data.region : 'Réf');
+                }
+                calculerMontantLigne(puInput);
+            }
+        })
+        .catch(function(err) {
+            console.error('Erreur récupération tarif:', err);
+        });
+}
+
+function updateAllLignesPrix() {
+    document.querySelectorAll('.ligne-commande').forEach(function(row) {
+        var prodSelect = row.querySelector('.select-produit');
+        if (prodSelect && prodSelect.value) {
+            autoFillPrix(prodSelect);
+        }
+    });
 }
 
 function ajouterLigneCommande() {
@@ -256,6 +304,8 @@ function ajouterLigneCommande() {
     clone.querySelectorAll('select').forEach(function(s) { s.selectedIndex = 0; });
     clone.querySelectorAll('input[type="number"]').forEach(function(i) { i.value = ''; });
     clone.querySelector('.sous-total-ligne').value = '0.00 $';
+    var badge = clone.querySelector('.badge-source-prix');
+    if (badge) badge.textContent = '';
 
     container.appendChild(clone);
 }

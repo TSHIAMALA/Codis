@@ -21,6 +21,10 @@ class Tarif
     #[ORM\JoinColumn(name: 'region_id', referencedColumnName: 'id', nullable: true)]
     private ?Region $region = null;
 
+    #[ORM\ManyToOne(targetEntity: ZoneCommerciale::class)]
+    #[ORM\JoinColumn(name: 'zone_id', referencedColumnName: 'id', nullable: true)]
+    private ?ZoneCommerciale $zone = null;
+
     #[ORM\ManyToOne(targetEntity: Produit::class)]
     #[ORM\JoinColumn(name: 'produit_id', referencedColumnName: 'id', nullable: false)]
     private ?Produit $produit = null;
@@ -54,6 +58,8 @@ class Tarif
     public function setPays(?Pays $p): self { $this->pays = $p; return $this; }
     public function getRegion(): ?Region { return $this->region; }
     public function setRegion(?Region $r): self { $this->region = $r; return $this; }
+    public function getZone(): ?ZoneCommerciale { return $this->zone; }
+    public function setZone(?ZoneCommerciale $z): self { $this->zone = $z; return $this; }
     public function getProduit(): ?Produit { return $this->produit; }
     public function setProduit(?Produit $p): self { $this->produit = $p; return $this; }
     public function getConditionnement(): ?Conditionnement { return $this->conditionnement; }

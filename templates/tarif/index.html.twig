@@ -1,0 +1,368 @@
+{% extends 'base/base.html.twig' %}
+
+{% block page_title %}Grille Tarifaire & Gestion des Prix par Zone{% endblock %}
+{% block page_subtitle %}Politique des prix multizone et multicanal (Grossistes, Détaillants, Régions & Secteurs){% endblock %}
+
+{% block body %}
+<!-- KPI Stats Bar -->
+<div class="grid-stats">
+    <div class="card-stat">
+        <div class="stat-label">Tarifs Actifs</div>
+        <div class="stat-value text-gold">{{ tarifsActifs }}</div>
+        <span class="badge badge-success"><i class="fa-solid fa-check-double" style="font-size: 10px;"></i> En vigueur</span>
+        <i class="fa-solid fa-tags stat-icon"></i>
+    </div>
+
+    <div class="card-stat">
+        <div class="stat-label">Régions Couvertes</div>
+        <div class="stat-value">{{ regionsCount }}</div>
+        <span class="badge badge-info"><i class="fa-solid fa-map-location-dot" style="font-size: 10px;"></i> RDC & Régional</span>
+        <i class="fa-solid fa-earth-africa stat-icon"></i>
+    </div>
+
+    <div class="card-stat">
+        <div class="stat-label">Produits au Catalogue</div>
+        <div class="stat-value">{{ produitsTarifesCount }} / {{ produits|length }}</div>
+        <span class="badge badge-gold"><i class="fa-solid fa-box-open" style="font-size: 10px;"></i> Produits tarifés</span>
+        <i class="fa-solid fa-boxes-stacked stat-icon"></i>
+    </div>
+
+    <div class="card-stat">
+        <div class="stat-label">Canaux Tarifaires</div>
+        <div class="stat-value">2</div>
+        <span class="badge badge-warning"><i class="fa-solid fa-users" style="font-size: 10px;"></i> Grossiste & Détaillant</span>
+        <i class="fa-solid fa-handshake stat-icon"></i>
+    </div>
+</div>
+
+<!-- Barre d'Actions & Filtres -->
+<div class="card-table" style="margin-bottom: 24px;">
+    <div class="card-table-header" style="flex-wrap: wrap; gap: 14px;">
+        <div class="card-table-title">
+            <i class="fa-solid fa-sliders text-gold"></i> Filtres & Recherche de Tarifs
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <form method="GET" action="{{ path('app_tarif_index') }}" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <select name="region_id" class="form-select" style="width: auto; padding: 7px 14px; font-size: 13px;" onchange="this.form.submit()">
+                    <option value="">-- Toutes les Régions --</option>
+                    {% for r in regions %}
+                        <option value="{{ r.id }}" {% if currentRegion == r.id %}selected{% endif %}>{{ r.nom }} ({{ r.code }})</option>
+                    {% endfor %}
+                </select>
+
+                <select name="produit_id" class="form-select" style="width: auto; padding: 7px 14px; font-size: 13px;" onchange="this.form.submit()">
+                    <option value="">-- Tous les Produits --</option>
+                    {% for p in produits %}
+                        <option value="{{ p.id }}" {% if currentProduit == p.id %}selected{% endif %}>{{ p.nom }}</option>
+                    {% endfor %}
+                </select>
+
+                <select name="type_client" class="form-select" style="width: auto; padding: 7px 14px; font-size: 13px;" onchange="this.form.submit()">
+                    <option value="">-- Tous les Canaux --</option>
+                    <option value="GROSSISTE" {% if currentTypeClient == 'GROSSISTE' %}selected{% endif %}>Grossistes Agréés</option>
+                    <option value="DETAILLANT" {% if currentTypeClient == 'DETAILLANT' %}selected{% endif %}>Détaillants / PDV</option>
+                </select>
+
+                {% if currentRegion or currentProduit or currentTypeClient %}
+                    <a href="{{ path('app_tarif_index') }}" class="btn btn-outline btn-sm" title="Réinitialiser les filtres">
+                        <i class="fa-solid fa-rotate-left"></i>
+                    </a>
+                {% endif %}
+            </form>
+
+            <button type="button" class="btn btn-gold btn-sm" onclick="openModal('modalNouveauTarif')">
+                <i class="fa-solid fa-plus-circle"></i> Définir un Tarif
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Section 1 : Matrice Comparative des Prix par Région -->
+<div class="card-table">
+    <div class="card-table-header">
+        <div class="card-table-title">
+            <i class="fa-solid fa-table-cells text-gold"></i> Matrice Comparative des Prix par Région & Conditionnement
+        </div>
+        <span class="badge badge-gold"><i class="fa-solid fa-scale-balanced" style="font-size: 10px;"></i> Comparatif Grossiste / Détaillant</span>
+    </div>
+
+    <div style="overflow-x: auto;">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th style="min-width: 180px;">Produit & Marque</th>
+                    <th style="min-width: 140px;">Conditionnement</th>
+                    {% for r in regions %}
+                        <th style="text-align: center; min-width: 150px; background: var(--table-th-bg);">
+                            <i class="fa-solid fa-location-dot text-gold"></i> {{ r.nom }}
+                        </th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for pId, item in matrice %}
+                    {% for condId, cItem in item.lignes %}
+                        <tr>
+                            {% if loop.first %}
+                                <td rowspan="{{ item.lignes|length }}" style="vertical-align: middle; font-weight: 700; border-right: 1px solid var(--border-subtle);">
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(212,160,23,0.1); border: 1px solid rgba(212,160,23,0.2); display: flex; align-items: center; justify-content: center; color: var(--gold);">
+                                            <i class="fa-solid fa-box"></i>
+                                        </div>
+                                        <div>
+                                            <div style="color: var(--text-main); font-size: 14px;">{{ item.produit.nom }}</div>
+                                            <div style="font-size: 11px; color: var(--text-muted);">{{ item.produit.code }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                            {% endif %}
+                            <td style="font-weight: 600; color: var(--text-main); border-right: 1px solid var(--border-subtle);">
+                                <span class="badge badge-info" style="font-size: 11px;">
+                                    <i class="fa-solid fa-cubes-stacked" style="font-size: 9px;"></i> {{ cItem.conditionnement.libelle }}
+                                </span>
+                            </td>
+                            {% for r in regions %}
+                                {% set prixData = cItem.prix_par_region[r.id] ?? null %}
+                                <td style="text-align: center; border-right: 1px solid var(--border-subtle);">
+                                    {% if prixData and (prixData.grossiste or prixData.detaillant) %}
+                                        <div style="display: flex; flex-direction: column; gap: 4px; align-items: center;">
+                                            {% if prixData.grossiste %}
+                                                <div style="font-size: 12px; font-weight: 700; color: var(--text-gold);">
+                                                    <span style="font-size: 10px; color: var(--text-muted); font-weight: normal;">Grossiste:</span> 
+                                                    {{ prixData.grossiste|number_format(2, ',', ' ') }} $
+                                                </div>
+                                            {% endif %}
+                                            {% if prixData.detaillant %}
+                                                <div style="font-size: 11.5px; font-weight: 600; color: var(--text-main);">
+                                                    <span style="font-size: 10px; color: var(--text-muted); font-weight: normal;">Détail:</span> 
+                                                    {{ prixData.detaillant|number_format(2, ',', ' ') }} $
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    {% else %}
+                                        <button type="button" class="btn btn-outline btn-sm" style="font-size: 10px; padding: 3px 8px;" onclick="prefillTarifModal({{ item.produit.id }}, {{ cItem.conditionnement.id }}, {{ r.id }})">
+                                            <i class="fa-solid fa-plus"></i> Définir
+                                        </button>
+                                    {% endif %}
+                                </td>
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="{{ 2 + regions|length }}" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                            <i class="fa-solid fa-boxes-packing" style="font-size: 32px; opacity: 0.4; margin-bottom: 10px;"></i>
+                            <p>Aucun produit configuré dans le catalogue pour le moment.</p>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Section 2 : Liste Complète & Historique des Tarifs -->
+<div class="card-table">
+    <div class="card-table-header">
+        <div class="card-table-title">
+            <i class="fa-solid fa-list-check text-gold"></i> Registre Détaillé des Tarifs en Vigueur ({{ tarifs|length }})
+        </div>
+    </div>
+
+    <div style="overflow-x: auto;">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>N° Réf</th>
+                    <th>Produit</th>
+                    <th>Conditionnement</th>
+                    <th>Territoire / Région</th>
+                    <th>Zone Commerciale</th>
+                    <th>Canal Client</th>
+                    <th>Prix Unitaire</th>
+                    <th>Date d'Effet</th>
+                    <th>Statut</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in tarifs %}
+                    <tr>
+                        <td style="font-family: monospace; font-size: 12px; color: var(--text-muted);">
+                            #TRF-{{ t.id }}
+                        </td>
+                        <td style="font-weight: 700;">
+                            {{ t.produit.nom }}
+                        </td>
+                        <td>
+                            <span class="badge badge-info">{{ t.conditionnement.libelle }}</span>
+                        </td>
+                        <td>
+                            {% if t.region %}
+                                <span class="badge badge-gold"><i class="fa-solid fa-location-dot" style="font-size: 8px;"></i> {{ t.region.nom }}</span>
+                            {% else %}
+                                <span class="badge badge-success"><i class="fa-solid fa-globe" style="font-size: 8px;"></i> National (Tous)</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if t.zone %}
+                                <span style="font-size: 12px; font-weight: 500;">{{ t.zone.nom }}</span>
+                            {% else %}
+                                <span style="font-size: 12px; color: var(--text-muted);">Toutes zones</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if t.typeClient == 'GROSSISTE' %}
+                                <span class="badge badge-primary">Grossiste Agréé</span>
+                            {% else %}
+                                <span class="badge badge-warning">Détaillant / PDV</span>
+                            {% endif %}
+                        </td>
+                        <td style="font-weight: 800; font-size: 15px; color: var(--text-gold);">
+                            {{ t.prix|number_format(2, ',', ' ') }} $
+                        </td>
+                        <td style="font-size: 12px; color: var(--text-muted);">
+                            {{ t.dateDebut ? t.dateDebut|date('d/m/Y') : '-' }}
+                            {% if t.dateFin %}
+                                <br><small style="color: #ef4444;">au {{ t.dateFin|date('d/m/Y') }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if t.actif %}
+                                <span class="badge badge-success"><i class="fa-solid fa-circle" style="font-size: 5px;"></i> Actif</span>
+                            {% else %}
+                                <span class="badge" style="background: rgba(100,116,139,0.15); color: var(--text-muted);"><i class="fa-solid fa-circle" style="font-size: 5px;"></i> Inactif</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: right;">
+                            <div style="display: inline-flex; gap: 6px;">
+                                <form method="POST" action="{{ path('app_tarif_toggle', {id: t.id}) }}" style="display: inline;">
+                                    <button type="submit" class="btn btn-outline btn-sm" title="Activer / Désactiver ce tarif" style="padding: 4px 8px;">
+                                        <i class="fa-solid {% if t.actif %}fa-toggle-on text-success{% else %}fa-toggle-off text-muted{% endif %}" style="font-size: 14px;"></i>
+                                    </button>
+                                </form>
+                                <form method="POST" action="{{ path('app_tarif_delete', {id: t.id}) }}" onsubmit="return confirm('Confirmez-vous la suppression de ce tarif ?');" style="display: inline;">
+                                    <button type="submit" class="btn btn-outline btn-sm" title="Supprimer" style="padding: 4px 8px; color: #ef4444; border-color: rgba(239,68,68,0.3);">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="10" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                            <i class="fa-solid fa-tag" style="font-size: 32px; opacity: 0.4; margin-bottom: 10px;"></i>
+                            <p>Aucun tarif trouvé pour les filtres sélectionnés.</p>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Définir / Mettre à jour un Tarif -->
+<div class="modal-backdrop" id="modalNouveauTarif">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title">
+                <i class="fa-solid fa-tags text-gold"></i> Définir un Tarif par Zone
+            </div>
+            <button type="button" class="modal-close" onclick="closeModal('modalNouveauTarif')">&times;</button>
+        </div>
+        <form method="POST" action="{{ path('app_tarif_nouveau') }}">
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Produit *</label>
+                        <select name="produit_id" id="modal_produit_id" class="form-select" required>
+                            <option value="">-- Sélectionner un produit --</option>
+                            {% for p in produits %}
+                                <option value="{{ p.id }}">{{ p.nom }} ({{ p.code }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Conditionnement *</label>
+                        <select name="conditionnement_id" id="modal_conditionnement_id" class="form-select" required>
+                            <option value="">-- Conditionnement --</option>
+                            {% for c in conditionnements %}
+                                <option value="{{ c.id }}">{{ c.libelle }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Région / Territoire</label>
+                        <select name="region_id" id="modal_region_id" class="form-select">
+                            <option value="">-- National (Toutes Régions) --</option>
+                            {% for r in regions %}
+                                <option value="{{ r.id }}">{{ r.nom }} ({{ r.code }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Zone Commerciale (Optionnel)</label>
+                        <select name="zone_id" id="modal_zone_id" class="form-select">
+                            <option value="">-- Toutes les Zones de la Région --</option>
+                            {% for z in zones %}
+                                <option value="{{ z.id }}">{{ z.nom }} ({{ z.code }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Canal / Type de Client *</label>
+                        <select name="type_client" id="modal_type_client" class="form-select" required>
+                            <option value="GROSSISTE">Grossiste Agréé</option>
+                            <option value="DETAILLANT">Détaillant / Point de Vente</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Prix Unitaire ($ USD) *</label>
+                        <input type="number" step="0.01" min="0.01" name="prix" id="modal_prix" class="form-control" placeholder="Ex: 450.00" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Date de Début d'Effet</label>
+                        <input type="date" name="date_debut" class="form-control" value="{{ "now"|date("Y-m-d") }}">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Date de Fin (Optionnel)</label>
+                        <input type="date" name="date_fin" class="form-control" placeholder="Période promotionnelle">
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('modalNouveauTarif')">Annuler</button>
+                <button type="submit" class="btn btn-gold">
+                    <i class="fa-solid fa-floppy-disk"></i> Enregistrer le Tarif
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block javascripts %}
+<script>
+function prefillTarifModal(produitId, conditionnementId, regionId) {
+    document.getElementById('modal_produit_id').value = produitId;
+    document.getElementById('modal_conditionnement_id').value = conditionnementId;
+    document.getElementById('modal_region_id').value = regionId;
+    openModal('modalNouveauTarif');
+}
+</script>
+{% endblock %}

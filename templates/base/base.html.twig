@@ -1169,7 +1169,7 @@
 			</li>
 
 			<!-- Ventes & Logistique -->
-			<li class="nav-item has-submenu {% if app.request.attributes.get('_route') in ['app_commande_index', 'app_livraison_index', 'app_paiement_index', 'app_consignation_index'] %}open{% endif %}">
+			<li class="nav-item has-submenu {% if app.request.attributes.get('_route') in ['app_commande_index', 'app_livraison_index', 'app_paiement_index', 'app_consignation_index', 'app_tarif_index'] %}open{% endif %}">
 				<div class="nav-item-header" onclick="toggleSubmenu(this)">
 					<div class="header-left">
 						<i class="fa-solid fa-cart-shopping icon-main"></i>
@@ -1178,6 +1178,12 @@
 					<i class="fa-solid fa-chevron-down chevron"></i>
 				</div>
 				<ul class="submenu">
+					<li class="submenu-item {% if app.request.attributes.get('_route') == 'app_tarif_index' %}active{% endif %}">
+						<a href="{{ path('app_tarif_index') }}">
+							<i class="fa-solid fa-tags"></i>
+							<span>Grille des Tarifs & Prix</span>
+						</a>
+					</li>
 					<li class="submenu-item {% if app.request.attributes.get('_route') == 'app_consignation_index' %}active{% endif %}">
 						<a href="{{ path('app_consignation_index') }}">
 							<i class="fa-solid fa-clipboard-check"></i>
