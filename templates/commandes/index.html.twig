@@ -1,0 +1,291 @@
+{% extends 'base/base.html.twig' %}
+
+{% block page_title %}Commandes & Ventes{% endblock %}
+{% block page_subtitle %}Supervision des commandes clients (Grossistes & Détaillants) et validation{% endblock %}
+
+{% block body %}
+<div class="card-table">
+    <div class="card-table-header">
+        <div class="card-table-title"><i class="fa-solid fa-cart-shopping"></i> Liste des Commandes</div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <span class="badge badge-gold">{{ commandes|length }} commandes</span>
+            <button onclick="openModal('modalAddCommande')" class="btn btn-gold btn-sm"><i class="fa-solid fa-plus"></i> Nouvelle Commande</button>
+        </div>
+    </div>
+
+    <table class="custom-table">
+        <thead>
+            <tr>
+                <th>N° Commande</th>
+                <th>Type</th>
+                <th>Client</th>
+                <th>Date</th>
+                <th>Montant</th>
+                <th>Statut</th>
+                <th style="text-align: right;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cmd in commandes %}
+            <tr>
+                <td class="font-bold">{{ cmd.numero }}</td>
+                <td><span class="badge badge-gold">{{ cmd.typeCommande }}</span></td>
+                <td>{{ cmd.clientNom }}</td>
+                <td>{{ cmd.dateCommande ? cmd.dateCommande|date('d/m/Y H:i') : '-' }}</td>
+                <td class="font-bold text-gold">{{ cmd.montantTotal|number_format(2, ',', ' ') }} $</td>
+                <td>
+                    {% if cmd.statut == 'VALIDEE' %}
+                        <span class="badge badge-success">Validée</span>
+                    {% elseif cmd.statut == 'SOUMISE' %}
+                        <span class="badge badge-warning">En attente validation</span>
+                    {% elseif cmd.statut == 'EXPEDIEE' %}
+                        <span class="badge badge-info">Expédiée</span>
+                    {% elseif cmd.statut == 'ANNULEE' %}
+                        <span class="badge badge-danger">Annulée</span>
+                    {% elseif cmd.statut == 'RECEPTIONNEE' %}
+                        <span class="badge badge-success"><i class="fa-solid fa-check-double"></i> Réceptionnée</span>
+                    {% elseif cmd.statut == 'BROUILLON' %}
+                        <span class="badge badge-primary">Brouillon</span>
+                    {% else %}
+                        <span class="badge badge-primary">{{ cmd.statut }}</span>
+                    {% endif %}
+                </td>
+                <td style="text-align: right;">
+                    <a href="{{ path('app_commande_show', {id: cmd.id}) }}" class="btn btn-outline btn-sm" title="Ouvrir"><i class="fa-solid fa-eye"></i></a>
+                    {% if cmd.statut in ['SOUMISE', 'BROUILLON'] %}
+                        <button onclick="openModal('modalEditCommande{{ cmd.id }}')" class="btn btn-outline btn-sm" title="Modifier"><i class="fa-solid fa-pen-to-square"></i></button>
+                    {% endif %}
+                    {% if cmd.statut not in ['ANNULEE', 'LIVREE', 'RECEPTIONNEE'] %}
+                        <button onclick="openModal('modalCancelCommande{{ cmd.id }}')" class="btn btn-danger btn-sm" title="Annuler (suppression logique)"><i class="fa-solid fa-ban"></i></button>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 32px;">Aucune commande enregistrée.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- ========== MODAL: NOUVELLE COMMANDE ========== -->
+<div id="modalAddCommande" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 720px;">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-file-circle-plus text-gold"></i> Nouvelle Commande Client</div>
+            <button onclick="closeModal('modalAddCommande')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="post" action="{{ path('app_commande_nouveau') }}" id="formNouvelleCommande">
+            <div class="modal-body">
+                <!-- Type de commande -->
+                <div class="form-group">
+                    <label class="form-label">Type de Client *</label>
+                    <select name="typeCommande" id="selectTypeCommande" class="form-select" required onchange="toggleClientFields()">
+                        <option value="GROSSISTE">Grossiste / Distributeur Agréé</option>
+                        <option value="DETAILLANT">Détaillant / Point de Vente</option>
+                    </select>
+                </div>
+
+                <!-- Sélection Client -->
+                <div class="form-row">
+                    <div class="form-group" id="fieldGrossiste">
+                        <label class="form-label">Grossiste / Distributeur *</label>
+                        <select name="grossiste_id" id="selectGrossiste" class="form-select">
+                            <option value="">-- Sélectionner un grossiste --</option>
+                            {% for g in grossistes %}
+                                <option value="{{ g.id }}">{{ g.raisonSociale }} ({{ g.code }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group" id="fieldDetaillant" style="display: none;">
+                        <label class="form-label">Détaillant / Point de Vente *</label>
+                        <select name="detailant_id" id="selectDetaillant" class="form-select">
+                            <option value="">-- Sélectionner un détaillant --</option>
+                            {% for d in detailants %}
+                                <option value="{{ d.id }}">{{ d.nom }} ({{ d.code }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Dépôt de Sortie *</label>
+                        <select name="depot_id" class="form-select" required>
+                            <option value="">-- Dépôt --</option>
+                            {% for d in depots %}
+                                <option value="{{ d.id }}">{{ d.nom }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Lignes de commande (dynamiques) -->
+                <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-subtle);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <div style="font-weight: 700; font-size: 14px; color: var(--text-gold);"><i class="fa-solid fa-list-ol"></i> Lignes de Commande</div>
+                        <button type="button" onclick="ajouterLigneCommande()" class="btn btn-outline btn-sm"><i class="fa-solid fa-plus"></i> Ajouter un produit</button>
+                    </div>
+
+                    <div id="lignesCommandeContainer">
+                        <!-- Ligne 1 par défaut -->
+                        <div class="ligne-commande" style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 10px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 10px; border: 1px solid var(--border-subtle);">
+                            <div style="flex: 2;">
+                                <label class="form-label" style="font-size: 11px;">Produit *</label>
+                                <select name="produit_ids[]" class="form-select" required>
+                                    <option value="">-- Produit --</option>
+                                    {% for p in produits %}
+                                        <option value="{{ p.id }}">{{ p.nom }} ({{ p.code }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div style="flex: 1.5;">
+                                <label class="form-label" style="font-size: 11px;">Conditionnement</label>
+                                <select name="conditionnement_ids[]" class="form-select">
+                                    <option value="">-- Unité --</option>
+                                    {% for c in conditionnements %}
+                                        <option value="{{ c.id }}">{{ c.libelle }} ({{ c.produit ? c.produit.nom : '' }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div style="flex: 1;">
+                                <label class="form-label" style="font-size: 11px;">Quantité *</label>
+                                <input type="number" step="0.001" name="quantites[]" class="form-control" placeholder="Qté" required oninput="calculerMontantLigne(this)">
+                            </div>
+                            <div style="flex: 1;">
+                                <label class="form-label" style="font-size: 11px;">Prix Unitaire ($) *</label>
+                                <input type="number" step="0.01" name="prix_unitaires[]" class="form-control" placeholder="P.U." required oninput="calculerMontantLigne(this)">
+                            </div>
+                            <div style="flex: 0.8;">
+                                <label class="form-label" style="font-size: 11px;">Sous-total</label>
+                                <input type="text" class="form-control sous-total-ligne" value="0.00 $" disabled style="font-weight: 700; color: var(--text-gold);">
+                            </div>
+                            <div style="flex: 0.3; text-align: center;">
+                                <button type="button" onclick="supprimerLigneCommande(this)" class="btn btn-danger btn-sm" title="Retirer" style="margin-bottom: 2px;"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Montant Total -->
+                    <div style="display: flex; justify-content: flex-end; margin-top: 12px; padding: 12px 16px; background: rgba(212, 160, 23, 0.08); border-radius: 10px; border: 1px solid rgba(212, 160, 23, 0.2);">
+                        <span style="font-size: 14px; font-weight: 700; color: var(--text-gold);">
+                            Total Commande : <span id="totalCommandeDisplay">0.00 $</span>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Observations -->
+                <div class="form-group" style="margin-top: 16px;">
+                    <label class="form-label">Observations / Notes</label>
+                    <textarea name="observation" class="form-control" rows="2" placeholder="Informations complémentaires sur la commande..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('modalAddCommande')" class="btn btn-outline">Annuler</button>
+                <button type="submit" class="btn btn-gold"><i class="fa-solid fa-paper-plane"></i> Soumettre la Commande</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Commandes Modals (Edit & Cancel — Rendered Outside Table) -->
+{% for cmd in commandes %}
+{% if cmd.statut in ['SOUMISE', 'BROUILLON'] %}
+<div id="modalEditCommande{{ cmd.id }}" class="modal-backdrop">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-pen-to-square text-gold"></i> Modifier Commande — {{ cmd.numero }}</div>
+            <button onclick="closeModal('modalEditCommande{{ cmd.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="post" action="{{ path('app_commande_modifier', {id: cmd.id}) }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Client</label>
+                    <input type="text" class="form-control" value="{{ cmd.clientNom }}" disabled>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Observations / Notes</label>
+                    <textarea name="observation" class="form-control" rows="3">{{ cmd.observation }}</textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('modalEditCommande{{ cmd.id }}')" class="btn btn-outline">Fermer</button>
+                <button type="submit" class="btn btn-gold"><i class="fa-solid fa-floppy-disk"></i> Enregistrer</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+{% if cmd.statut not in ['ANNULEE', 'LIVREE', 'RECEPTIONNEE'] %}
+<div id="modalCancelCommande{{ cmd.id }}" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 450px;">
+        <div class="modal-header">
+            <div class="modal-title text-red"><i class="fa-solid fa-triangle-exclamation"></i> Annulation Logique</div>
+            <button onclick="closeModal('modalCancelCommande{{ cmd.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="post" action="{{ path('app_commande_annuler', {id: cmd.id}) }}">
+            <div class="modal-body">
+                <p style="font-size: 14px; line-height: 1.6; color: var(--text-main);">
+                    Voulez-vous annuler la commande <strong class="text-gold">{{ cmd.numero }}</strong> ({{ cmd.clientNom }}) ?
+                </p>
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
+                    Le statut passera à <strong>ANNULEE</strong> (suppression logique sans effacer la trace).
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('modalCancelCommande{{ cmd.id }}')" class="btn btn-outline">Retour</button>
+                <button type="submit" class="btn btn-danger"><i class="fa-solid fa-ban"></i> Confirmer Annulation</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endfor %}
+
+{% block body_end %}
+<script>
+function toggleClientFields() {
+    var type = document.getElementById('selectTypeCommande').value;
+    document.getElementById('fieldGrossiste').style.display = (type === 'GROSSISTE') ? 'block' : 'none';
+    document.getElementById('fieldDetaillant').style.display = (type === 'DETAILLANT') ? 'block' : 'none';
+}
+
+function ajouterLigneCommande() {
+    var container = document.getElementById('lignesCommandeContainer');
+    var firstLigne = container.querySelector('.ligne-commande');
+    var clone = firstLigne.cloneNode(true);
+
+    // Reset values
+    clone.querySelectorAll('select').forEach(function(s) { s.selectedIndex = 0; });
+    clone.querySelectorAll('input[type="number"]').forEach(function(i) { i.value = ''; });
+    clone.querySelector('.sous-total-ligne').value = '0.00 $';
+
+    container.appendChild(clone);
+}
+
+function supprimerLigneCommande(btn) {
+    var container = document.getElementById('lignesCommandeContainer');
+    if (container.querySelectorAll('.ligne-commande').length > 1) {
+        btn.closest('.ligne-commande').remove();
+        recalculerTotalCommande();
+    }
+}
+
+function calculerMontantLigne(input) {
+    var row = input.closest('.ligne-commande');
+    var qte = parseFloat(row.querySelector('input[name="quantites[]"]').value) || 0;
+    var pu = parseFloat(row.querySelector('input[name="prix_unitaires[]"]').value) || 0;
+    var sousTotal = qte * pu;
+    row.querySelector('.sous-total-ligne').value = sousTotal.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' $';
+    recalculerTotalCommande();
+}
+
+function recalculerTotalCommande() {
+    var total = 0;
+    document.querySelectorAll('.ligne-commande').forEach(function(row) {
+        var qte = parseFloat(row.querySelector('input[name="quantites[]"]').value) || 0;
+        var pu = parseFloat(row.querySelector('input[name="prix_unitaires[]"]').value) || 0;
+        total += qte * pu;
+    });
+    document.getElementById('totalCommandeDisplay').textContent = total.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' $';
+}
+</script>
+{% endblock %}
+{% endblock %}

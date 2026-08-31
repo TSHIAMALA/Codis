@@ -1,0 +1,177 @@
+{% extends 'base/base.html.twig' %}
+
+{% block page_title %}Production & Usines{% endblock %}
+{% block page_subtitle %}Gestion des ordres de fabrication, suivi des lots et validation industrielle{% endblock %}
+
+{% block body %}
+<div class="card-table">
+    <div class="card-table-header">
+        <div class="card-table-title"><i class="fa-solid fa-industry"></i> Ordres de Production</div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <span class="badge badge-gold">{{ productions|length }} ordres</span>
+            <button onclick="openModal('modalAddProduction')" class="btn btn-gold btn-sm"><i class="fa-solid fa-plus"></i> Créer Ordre de Fabrication</button>
+        </div>
+    </div>
+
+    <table class="custom-table">
+        <thead>
+            <tr>
+                <th>N° Ordre</th>
+                <th>Usine</th>
+                <th>Date Production</th>
+                <th>Statut</th>
+                <th>Lignes de Production</th>
+                <th style="text-align: right;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for prod in productions %}
+            <tr>
+                <td class="font-bold">{{ prod.numero }}</td>
+                <td>{{ prod.usine ? prod.usine.nom : '-' }}</td>
+                <td>{{ prod.dateProduction ? prod.dateProduction|date('d/m/Y') : '-' }}</td>
+                <td>
+                    {% if prod.statut == 'VALIDEE' %}
+                        <span class="badge badge-success"><i class="fa-solid fa-check" style="font-size: 10px;"></i> Validée (Stock usine +)</span>
+                    {% elseif prod.statut == 'BROUILLON' %}
+                        <span class="badge badge-warning">Brouillon</span>
+                    {% elseif prod.statut == 'ANNULEE' %}
+                        <span class="badge badge-danger">Annulée</span>
+                    {% else %}
+                        <span class="badge badge-danger">{{ prod.statut }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% for l in prod.lignes %}
+                        <div style="padding: 2px 0;">
+                            <span style="color: var(--text-muted);">•</span>
+                            {{ l.produit ? l.produit.nom : '' }} :
+                            <strong class="text-gold">{{ l.quantite }}</strong>
+                            <span class="badge badge-gold" style="font-size: 10px; padding: 2px 8px;">{{ l.lot ? l.lot.numeroLot : 'N/A' }}</span>
+                        </div>
+                    {% endfor %}
+                </td>
+                <td style="text-align: right; white-space: nowrap;">
+                    {% if prod.statut == 'BROUILLON' %}
+                    <form method="post" action="{{ path('app_production_valider', {id: prod.id}) }}" style="display:inline;">
+                        <button type="submit" class="btn btn-primary btn-sm" title="Valider & Entrer en Stock"><i class="fa-solid fa-check"></i> Valider</button>
+                    </form>
+                    <button onclick="openModal('modalEditProduction{{ prod.id }}')" class="btn btn-outline btn-sm" title="Modifier"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button onclick="openModal('modalCancelProduction{{ prod.id }}')" class="btn btn-danger btn-sm" title="Annuler (suppression logique)"><i class="fa-solid fa-ban"></i></button>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 32px;">Aucune production enregistrée.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Modal Add Production -->
+<div id="modalAddProduction" class="modal-backdrop">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-industry text-gold"></i> Nouveau Ordre de Fabrication</div>
+            <button onclick="closeModal('modalAddProduction')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="post" action="{{ path('app_production_nouveau') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Usine de Production *</label>
+                    <select name="usine_id" class="form-select" required>
+                        <option value="">-- Sélectionner une usine --</option>
+                        {% for u in usines %}
+                            <option value="{{ u.id }}">{{ u.nom }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Produit à Fabriquer *</label>
+                        <select name="produit_id" class="form-select" required>
+                            <option value="">-- Sélectionner le produit --</option>
+                            {% for p in produits %}
+                                <option value="{{ p.id }}">{{ p.nom }} (Code: {{ p.code }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Quantité *</label>
+                        <input type="number" step="0.001" name="quantite" class="form-control" placeholder="ex: 5000" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Date de Production</label>
+                    <input type="date" name="dateProduction" class="form-control" value="{{ 'now'|date('Y-m-d') }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Observations / Notes de Fabrication</label>
+                    <textarea name="observation" class="form-control" rows="3" placeholder="Lot de production standard..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('modalAddProduction')" class="btn btn-outline">Annuler</button>
+                <button type="submit" class="btn btn-gold"><i class="fa-solid fa-plus"></i> Créer Ordre de Fabrication</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Production Modals (Rendered Outside Table) -->
+{% for prod in productions %}
+{% if prod.statut == 'BROUILLON' %}
+<div id="modalEditProduction{{ prod.id }}" class="modal-backdrop">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-pen-to-square text-gold"></i> Modifier Ordre de Production — {{ prod.numero }}</div>
+            <button onclick="closeModal('modalEditProduction{{ prod.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="post" action="{{ path('app_production_modifier', {id: prod.id}) }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Usine</label>
+                    <input type="text" class="form-control" value="{{ prod.usine ? prod.usine.nom : '' }}" disabled>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Date de Production</label>
+                    <input type="date" name="dateProduction" class="form-control" value="{{ prod.dateProduction ? prod.dateProduction|date('Y-m-d') : '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Observations</label>
+                    <textarea name="observation" class="form-control" rows="3">{{ prod.observation }}</textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('modalEditProduction{{ prod.id }}')" class="btn btn-outline">Annuler</button>
+                <button type="submit" class="btn btn-gold"><i class="fa-solid fa-floppy-disk"></i> Enregistrer</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="modalCancelProduction{{ prod.id }}" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 450px;">
+        <div class="modal-header">
+            <div class="modal-title text-red"><i class="fa-solid fa-triangle-exclamation"></i> Annulation Logique</div>
+            <button onclick="closeModal('modalCancelProduction{{ prod.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="post" action="{{ path('app_production_annuler', {id: prod.id}) }}">
+            <div class="modal-body">
+                <p style="font-size: 14px; line-height: 1.6; color: var(--text-main);">
+                    Voulez-vous annuler l'ordre de production <strong class="text-gold">{{ prod.numero }}</strong> ?
+                </p>
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
+                    Le statut passera à <strong>ANNULEE</strong> (suppression logique sans perte d'historique).
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('modalCancelProduction{{ prod.id }}')" class="btn btn-outline">Retour</button>
+                <button type="submit" class="btn btn-danger"><i class="fa-solid fa-ban"></i> Confirmer Annulation</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endfor %}
+{% endblock %}

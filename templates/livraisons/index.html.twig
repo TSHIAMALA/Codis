@@ -1,0 +1,177 @@
+{% extends 'base/base.html.twig' %}
+
+{% block page_title %}Bons de Livraison & Expéditions{% endblock %}
+{% block page_subtitle %}Gestion des expéditions, transit et confirmation de réceptions{% endblock %}
+
+{% block body %}
+<div class="card-table">
+    <div class="card-table-header">
+        <div class="card-table-title"><i class="fa-solid fa-truck-fast"></i> Bons de Livraison</div>
+        <span class="badge badge-gold">{{ livraisons|length }} expéditions</span>
+    </div>
+
+    <table class="custom-table">
+        <thead>
+            <tr>
+                <th>N° BL</th>
+                <th>Commande</th>
+                <th>Destinataire</th>
+                <th>Dépôt Source</th>
+                <th>Date Prévue</th>
+                <th>Paiement</th>
+                <th>Statut</th>
+                <th style="text-align: right;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for l in livraisons %}
+            {% set cmd = l.commande %}
+            {% set isDistAgree = cmd and cmd.grossiste and cmd.grossiste.typeDistribution is defined and cmd.grossiste.typeDistribution == 'DISTRIBUTEUR_AGREE' %}
+            {% set totalPaye = 0 %}
+            {% if cmd %}
+                {% for p in cmd.paiements %}
+                    {% if p.statut == 'VALIDE' %}
+                        {% set totalPaye = totalPaye + p.montant %}
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+            {% set montantCmd = cmd ? cmd.montantTotal|default('0') : '0' %}
+            {% set estPaye = (totalPaye|number_format(2) >= montantCmd|number_format(2)) %}
+            <tr>
+                <td class="font-bold">{{ l.numero }}</td>
+                <td>{{ cmd ? cmd.numero : '-' }}</td>
+                <td>{{ cmd ? cmd.clientNom : '-' }}</td>
+                <td>{{ l.depot ? l.depot.nom : '-' }}</td>
+                <td>{{ l.datePrevue ? l.datePrevue|date('d/m/Y') : '-' }}</td>
+                <td>
+                    {% if cmd %}
+                        {% if estPaye %}
+                            <span class="badge badge-success"><i class="fa-solid fa-check-circle" style="font-size: 10px;"></i> Payé ({{ totalPaye|number_format(2, ',', ' ') }} $)</span>
+                        {% else %}
+                            <span class="badge badge-danger"><i class="fa-solid fa-clock" style="font-size: 10px;"></i> {{ totalPaye|number_format(2, ',', ' ') }} / {{ montantCmd|number_format(2, ',', ' ') }} $</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="badge badge-primary">-</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if l.statut == 'RECEPTION_CONFIRMEE' %}
+                        <span class="badge badge-success"><i class="fa-solid fa-check" style="font-size: 10px;"></i> Réception confirmée</span>
+                    {% elseif l.statut == 'EN_TRANSIT' %}
+                        <span class="badge badge-info"><i class="fa-solid fa-truck" style="font-size: 10px;"></i> En transit</span>
+                    {% elseif l.statut == 'ANNULEE' %}
+                        <span class="badge badge-danger">Annulée</span>
+                    {% else %}
+                        <span class="badge badge-warning">{{ l.statut }}</span>
+                    {% endif %}
+                </td>
+                <td style="text-align: right; white-space: nowrap;">
+                    {% if l.statut == 'PREPARATION' %}
+                        {% if isDistAgree and not estPaye %}
+                            {# Distributeur Agréé non payé : bouton désactivé avec tooltip explicatif #}
+                            <span style="position: relative; display: inline-block;" title="⚠️ Distributeur Agréé : le client doit d'abord verser le cash à la Caisse (Paiements & Crédits) avant de pouvoir expédier.">
+                                <button type="button" class="btn btn-outline btn-sm" disabled style="opacity: 0.5; cursor: not-allowed;">
+                                    <i class="fa-solid fa-lock"></i> Paiement requis
+                                </button>
+                            </span>
+                        {% else %}
+                            <form method="post" action="{{ path('app_livraison_expedier', {id: l.id}) }}" style="display:inline;">
+                                <button type="submit" class="btn btn-primary btn-sm" title="Expédier"><i class="fa-solid fa-paper-plane"></i> Expédier</button>
+                            </form>
+                        {% endif %}
+                    {% endif %}
+
+                    {% if l.statut in ['EN_TRANSIT', 'EXPEDIEE'] %}
+                    <form method="post" action="{{ path('app_livraison_confirmer', {id: l.id}) }}" style="display:inline;">
+                        <button type="submit" class="btn btn-gold btn-sm" title="Confirmer la réception"><i class="fa-solid fa-square-check"></i> Confirmer</button>
+                    </form>
+                    {% endif %}
+
+                    {% if l.statut not in ['RECEPTION_CONFIRMEE', 'ANNULEE'] %}
+                        <button onclick="openModal('modalEditLivraison{{ l.id }}')" class="btn btn-outline btn-sm" title="Modifier"><i class="fa-solid fa-pen-to-square"></i></button>
+                        <button onclick="openModal('modalCancelLivraison{{ l.id }}')" class="btn btn-danger btn-sm" title="Annuler (suppression logique)"><i class="fa-solid fa-ban"></i></button>
+                    {% endif %}
+                </td>
+            </tr>
+
+            {# Message d'aide pour les Distributeurs Agréés non payés #}
+            {% if l.statut == 'PREPARATION' and isDistAgree and not estPaye %}
+            <tr>
+                <td colspan="8" style="padding: 8px 24px; background: rgba(220, 38, 38, 0.06); border-left: 3px solid var(--primary);">
+                    <div style="display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-muted);">
+                        <i class="fa-solid fa-triangle-exclamation text-red" style="font-size: 14px;"></i>
+                        <span>
+                            <strong class="text-red">Distribution Indirecte</strong> — Le Distributeur Agréé <strong>{{ cmd.clientNom }}</strong> doit d'abord verser 
+                            <strong class="text-gold">{{ (montantCmd - totalPaye)|number_format(2, ',', ' ') }} $</strong> 
+                            à la caisse. 
+                            <a href="{{ path('app_paiement_index') }}" style="color: var(--text-gold); text-decoration: underline; font-weight: 700;">
+                                <i class="fa-solid fa-arrow-right"></i> Aller aux Paiements & Crédits
+                            </a>
+                        </span>
+                    </div>
+                </td>
+            </tr>
+            {% endif %}
+
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Livraisons Modals (Rendered Outside Table) -->
+{% for l in livraisons %}
+{% if l.statut not in ['RECEPTION_CONFIRMEE', 'ANNULEE'] %}
+<div id="modalEditLivraison{{ l.id }}" class="modal-backdrop">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-pen-to-square text-gold"></i> Modifier Bon de Livraison — {{ l.numero }}</div>
+            <button onclick="closeModal('modalEditLivraison{{ l.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="post" action="{{ path('app_livraison_modifier', {id: l.id}) }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Commande Associée</label>
+                    <input type="text" class="form-control" value="{{ l.commande ? l.commande.numero : 'N/A' }}" disabled>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Date Prévue de Livraison</label>
+                    <input type="date" name="datePrevue" class="form-control" value="{{ l.datePrevue ? l.datePrevue|date('Y-m-d') : '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Observations Logistiques</label>
+                    <textarea name="observation" class="form-control" rows="3">{{ l.observation }}</textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('modalEditLivraison{{ l.id }}')" class="btn btn-outline">Annuler</button>
+                <button type="submit" class="btn btn-gold"><i class="fa-solid fa-floppy-disk"></i> Enregistrer</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="modalCancelLivraison{{ l.id }}" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 450px;">
+        <div class="modal-header">
+            <div class="modal-title text-red"><i class="fa-solid fa-triangle-exclamation"></i> Annulation Logique</div>
+            <button onclick="closeModal('modalCancelLivraison{{ l.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="post" action="{{ path('app_livraison_annuler', {id: l.id}) }}">
+            <div class="modal-body">
+                <p style="font-size: 14px; line-height: 1.6; color: var(--text-main);">
+                    Voulez-vous annuler le bon de livraison <strong class="text-gold">{{ l.numero }}</strong> ?
+                </p>
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
+                    Le statut passera à <strong>ANNULEE</strong> (suppression logique sans effacer la trace).
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('modalCancelLivraison{{ l.id }}')" class="btn btn-outline">Retour</button>
+                <button type="submit" class="btn btn-danger"><i class="fa-solid fa-ban"></i> Confirmer Annulation</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,166 @@
+{% extends 'base/base.html.twig' %}
+
+{% block page_title %}Catalogue & Produits{% endblock %}
+{% block page_subtitle %}Gestion des références produits, marques et catégories de distribution{% endblock %}
+
+{% block body %}
+<!-- Produits Table -->
+<div class="card-table">
+    <div class="card-table-header">
+        <div class="card-table-title"><i class="fa-solid fa-boxes-packing text-gold"></i> Catalogue des Produits</div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <span class="badge badge-gold">{{ produits|length }} références</span>
+            <button onclick="openModal('modalAddProduit')" class="btn btn-gold btn-sm"><i class="fa-solid fa-plus"></i> Nouveau Produit</button>
+        </div>
+    </div>
+
+    <table class="custom-table">
+        <thead>
+            <tr>
+                <th>Code</th>
+                <th>Nom du Produit</th>
+                <th>Marque</th>
+                <th>Catégorie</th>
+                <th>Description</th>
+                <th>Statut</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in produits %}
+            <tr>
+                <td class="font-bold text-gold">{{ p.code }}</td>
+                <td class="font-bold">{{ p.nom }}</td>
+                <td><span class="badge badge-info">{{ p.marque ? p.marque.nom : '-' }}</span></td>
+                <td><span class="badge badge-gold">{{ p.categorie ? p.categorie.libelle : '-' }}</span></td>
+                <td style="color: var(--text-muted);">{{ p.description ? p.description : '-' }}</td>
+                <td>
+                    {% if p.actif %}
+                        <span class="badge badge-success">Actif</span>
+                    {% else %}
+                        <span class="badge badge-danger">Inactif</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 32px;">Aucun produit dans le catalogue.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Catégories Table -->
+<div class="card-table">
+    <div class="card-table-header">
+        <div class="card-table-title"><i class="fa-solid fa-tags text-gold"></i> Catégories de Produits</div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <span class="badge badge-gold">{{ categories|length }} catégories</span>
+            <button onclick="openModal('modalAddCategorie')" class="btn btn-gold btn-sm"><i class="fa-solid fa-plus"></i> Nouvelle Catégorie</button>
+        </div>
+    </div>
+
+    <table class="custom-table">
+        <thead>
+            <tr>
+                <th>Code</th>
+                <th>Libellé de la Catégorie</th>
+                <th>Statut</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in categories %}
+            <tr>
+                <td class="font-bold text-gold">{{ c.code }}</td>
+                <td class="font-bold">{{ c.libelle }}</td>
+                <td>
+                    {% if c.actif %}
+                        <span class="badge badge-success">Actif</span>
+                    {% else %}
+                        <span class="badge badge-danger">Inactif</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" style="text-align: center; color: var(--text-muted); padding: 32px;">Aucune catégorie répertoriée.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Modal Add Produit -->
+<div id="modalAddProduit" class="modal-backdrop">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-box text-gold"></i> Ajouter un Nouveau Produit</div>
+            <button onclick="closeModal('modalAddProduit')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="post" action="{{ path('app_produit_nouveau') }}">
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Nom du Produit *</label>
+                        <input type="text" name="nom" class="form-control" placeholder="ex: Eau Minérale 1.5L" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Code Produit (Auto si vide)</label>
+                        <input type="text" name="code" class="form-control" placeholder="ex: PRD-EAU-15">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Catégorie *</label>
+                        <select name="categorie_id" class="form-select" required>
+                            <option value="">-- Sélectionner une catégorie --</option>
+                            {% for cat in categories %}
+                                <option value="{{ cat.id }}">{{ cat.libelle }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Marque *</label>
+                        <select name="marque_id" class="form-select" required>
+                            <option value="">-- Sélectionner une marque --</option>
+                            {% for m in marques %}
+                                <option value="{{ m.id }}">{{ m.nom }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description / Détails</label>
+                    <textarea name="description" class="form-control" rows="3" placeholder="Conditionnement par pack de 12 bouteilles..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('modalAddProduit')" class="btn btn-outline">Annuler</button>
+                <button type="submit" class="btn btn-gold"><i class="fa-solid fa-plus"></i> Enregistrer Produit</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Add Categorie -->
+<div id="modalAddCategorie" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-tags text-gold"></i> Créer une Catégorie de Produit</div>
+            <button onclick="closeModal('modalAddCategorie')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="post" action="{{ path('app_categorie_nouveau') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Libellé de la Catégorie *</label>
+                    <input type="text" name="libelle" class="form-control" placeholder="ex: Boissons Gazeuses" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Code Catégorie (Auto si vide)</label>
+                    <input type="text" name="code" class="form-control" placeholder="ex: CAT-BOISSONS">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('modalAddCategorie')" class="btn btn-outline">Annuler</button>
+                <button type="submit" class="btn btn-gold"><i class="fa-solid fa-plus"></i> Créer Catégorie</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

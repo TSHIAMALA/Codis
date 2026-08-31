@@ -1,0 +1,160 @@
+{% extends 'base/base.html.twig' %}
+
+{% block page_title %}
+    {% if activeTab == 'detail' %}
+        Détail Stocks par Emplacement & Lot — Industrie & Stocks
+    {% elseif activeTab == 'mouvements' %}
+        Historique Mouvements de Stock — Industrie & Stocks
+    {% else %}
+        Synthèse des Stocks par Produit — Industrie & Stocks
+    {% endif %}
+{% endblock %}
+
+{% block page_subtitle %}
+    {% if activeTab == 'detail' %}
+        Traçabilité par usine, dépôt central, numéro de lot et conditionnement
+    {% elseif activeTab == 'mouvements' %}
+        Journal d'audit des entrées, sorties et transferts inter-dépôts
+    {% else %}
+        Niveaux de stocks disponibles et cumulés sur l'ensemble des sites
+    {% endif %}
+{% endblock %}
+
+{% block body %}
+<!-- Tab Filter Bar -->
+<div style="display: flex; gap: 12px; margin-bottom: 28px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 16px; flex-wrap: wrap;">
+    <a href="{{ path('app_stock_index', {tab: 'synthese'}) }}" class="btn {% if activeTab == 'synthese' %}btn-gold{% else %}btn-outline{% endif %} btn-sm">
+        <i class="fa-solid fa-boxes-packing"></i> Synthèse par Produit ({{ stocksParProduit|length }})
+    </a>
+    <a href="{{ path('app_stock_index', {tab: 'detail'}) }}" class="btn {% if activeTab == 'detail' %}btn-gold{% else %}btn-outline{% endif %} btn-sm">
+        <i class="fa-solid fa-layer-group"></i> Détail par Emplacement & Lot ({{ stocks|length }})
+    </a>
+    <a href="{{ path('app_stock_index', {tab: 'mouvements'}) }}" class="btn {% if activeTab == 'mouvements' %}btn-gold{% else %}btn-outline{% endif %} btn-sm">
+        <i class="fa-solid fa-timeline"></i> Historique Mouvements ({{ mouvements|length }})
+    </a>
+</div>
+
+{% if activeTab in ['all', 'synthese'] %}
+<!-- 1. Synthèse Consolidée des Stocks par Produit -->
+<div class="card-table">
+    <div class="card-table-header">
+        <div class="card-table-title"><i class="fa-solid fa-boxes-packing text-gold"></i> Synthèse des Stocks par Produit</div>
+        <span class="badge badge-gold">{{ stocksParProduit|length }} produits</span>
+    </div>
+
+    <table class="custom-table">
+        <thead>
+            <tr>
+                <th>Code</th>
+                <th>Produit</th>
+                <th>Catégorie</th>
+                <th>Emplacements</th>
+                <th>Disponible</th>
+                <th>Réservé</th>
+                <th>En Transit</th>
+                <th>Stock Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in stocksParProduit %}
+            {% set grandTotal = item.disponible + item.reservee + item.transit %}
+            <tr>
+                <td class="font-bold text-gold">{{ item.produit.code }}</td>
+                <td class="font-bold">{{ item.produit.nom }}</td>
+                <td><span class="badge badge-info">{{ item.produit.categorie ? item.produit.categorie.libelle : '-' }}</span></td>
+                <td>
+                    <span style="font-size: 12px; color: var(--text-muted);">
+                        {{ item.emplacements|join(', ') }} ({{ item.nbLots }} lot(s))
+                    </span>
+                </td>
+                <td class="font-bold text-success" style="font-size: 15px;">{{ item.disponible|number_format(3, '.', ' ') }}</td>
+                <td class="text-warning font-bold">{{ item.reservee|number_format(3, '.', ' ') }}</td>
+                <td class="text-info font-bold">{{ item.transit|number_format(3, '.', ' ') }}</td>
+                <td class="font-bold text-gold" style="font-size: 16px;">{{ grandTotal|number_format(3, '.', ' ') }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 32px;">Aucun stock répertorié.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if activeTab in ['all', 'detail'] %}
+<!-- 2. Détail par Emplacement & Lot -->
+<div class="card-table">
+    <div class="card-table-header">
+        <div class="card-table-title"><i class="fa-solid fa-layer-group text-gold"></i> Détail par Emplacement & Lot</div>
+        <span class="badge badge-gold">{{ stocks|length }} lots</span>
+    </div>
+
+    <table class="custom-table">
+        <thead>
+            <tr>
+                <th>Emplacement / Dépôt</th>
+                <th>Produit</th>
+                <th>Lot</th>
+                <th>Conditionnement</th>
+                <th>Disponible</th>
+                <th>Réservé</th>
+                <th>En Transit</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in stocks %}
+            <tr>
+                <td class="font-bold">{{ s.emplacement ? s.emplacement.nom : '-' }}</td>
+                <td>{{ s.produit ? s.produit.nom : '-' }}</td>
+                <td><span class="badge badge-gold">{{ s.lot ? s.lot.numeroLot : '-' }}</span></td>
+                <td>{{ s.conditionnement ? s.conditionnement.libelle : '-' }}</td>
+                <td class="font-bold text-success">{{ s.quantiteDisponible }}</td>
+                <td class="text-warning">{{ s.quantiteReservee }}</td>
+                <td class="text-info">{{ s.quantiteTransit }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 32px;">Aucun détail de stock.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if activeTab in ['all', 'mouvements'] %}
+<!-- 3. Historique des Mouvements -->
+<div class="card-table">
+    <div class="card-table-header">
+        <div class="card-table-title"><i class="fa-solid fa-timeline text-gold"></i> Historique des Mouvements</div>
+        <span class="badge badge-gold">{{ mouvements|length }} mouvements</span>
+    </div>
+
+    <table class="custom-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Produit</th>
+                <th>Quantité</th>
+                <th>Source</th>
+                <th>Destination</th>
+                <th>Motif</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for m in mouvements %}
+            <tr>
+                <td>{{ m.dateMouvement ? m.dateMouvement|date('d/m/Y H:i') : '-' }}</td>
+                <td><span class="badge badge-info">{{ m.typeMouvement }}</span></td>
+                <td class="font-bold">{{ m.produit ? m.produit.nom : '-' }}</td>
+                <td class="font-bold text-gold">{{ m.quantite }}</td>
+                <td>{{ m.emplacementSource ? m.emplacementSource.nom : '-' }}</td>
+                <td>{{ m.emplacementDestination ? m.emplacementDestination.nom : '-' }}</td>
+                <td>{{ m.observation }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 32px;">Aucun mouvement enregistré.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endblock %}

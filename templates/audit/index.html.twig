@@ -1,0 +1,38 @@
+{% extends 'base/base.html.twig' %}
+
+{% block page_title %}Audit & Traçabilité Complète{% endblock %}
+{% block page_subtitle %}Historique de toutes les opérations sensibles et intégrité des données{% endblock %}
+
+{% block body %}
+<div class="card-table">
+    <div class="card-table-header">
+        <div class="card-table-title"><i class="fa-solid fa-shield-halved"></i> Journal d'Audit Système</div>
+        <span class="badge badge-gold">{{ logs|length }} entrées</span>
+    </div>
+
+    <table class="custom-table">
+        <thead>
+            <tr>
+                <th>Horodatage</th>
+                <th>Utilisateur</th>
+                <th>Table / Entité</th>
+                <th>Action</th>
+                <th>ID Réf</th>
+                <th>Adresse IP</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td>{{ log.createdAt ? log.createdAt|date('d/m/Y H:i:s') : '-' }}</td>
+                <td class="font-bold">{{ log.utilisateur ? log.utilisateur.username : 'System' }}</td>
+                <td><span class="badge badge-gold">{{ log.tableName }}</span></td>
+                <td><span class="badge badge-info">{{ log.action }}</span></td>
+                <td>#{{ log.referenceId }}</td>
+                <td style="color: var(--text-muted);">{{ log.adresseIp }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

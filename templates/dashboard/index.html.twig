@@ -1,0 +1,166 @@
+{% extends 'base/base.html.twig' %}
+
+{% block page_title %}Vue Consolidée — CODIS{% endblock %}
+{% block page_subtitle %}Indicateurs clés de performance industrielle, commerciale et logistique par région{% endblock %}
+
+{% block body %}
+<!-- Top Key KPI Stats Cards -->
+<div class="grid-stats">
+    <div class="card-stat">
+        <div class="stat-label">Chiffre d'Affaires</div>
+        <div class="stat-value">{{ chiffreAffaires|number_format(2, ',', ' ') }} $</div>
+        <span class="badge badge-success"><i class="fa-solid fa-arrow-trend-up" style="font-size: 10px;"></i> Réseau actif</span>
+        <i class="fa-solid fa-wallet stat-icon"></i>
+    </div>
+
+    <div class="card-stat">
+        <div class="stat-label">Stock Total Consolidé</div>
+        <div class="stat-value text-gold">{{ totalStockDisponible|number_format(0, ',', ' ') }} <span style="font-size: 14px; font-weight: 500;">unités</span></div>
+        <span class="badge badge-gold"><i class="fa-solid fa-boxes-stacked" style="font-size: 10px;"></i> {{ totalStockReserve|number_format(0, ',', ' ') }} réservées</span>
+        <i class="fa-solid fa-warehouse stat-icon"></i>
+    </div>
+
+    <div class="card-stat">
+        <div class="stat-label">Partenaires Commerciaux</div>
+        <div class="stat-value">{{ totalGrossistes }}</div>
+        <span class="badge badge-info">{{ totalDetailants }} Points de vente</span>
+        <i class="fa-solid fa-shop stat-icon"></i>
+    </div>
+
+    <div class="card-stat">
+        <div class="stat-label">Livraisons & Transit</div>
+        <div class="stat-value">{{ livraisonsEnCours }}</div>
+        <span class="badge badge-warning"><i class="fa-solid fa-truck" style="font-size: 10px;"></i> En cours d'expédition</span>
+        <i class="fa-solid fa-truck-moving stat-icon"></i>
+    </div>
+</div>
+
+<!-- Niveaux de Stocks par Région / Territoire -->
+<div class="card-table">
+    <div class="card-table-header">
+        <div class="card-table-title"><i class="fa-solid fa-map-location-dot text-gold"></i> Répartition des Stocks par Région / Territoire</div>
+        <span class="badge badge-gold">{{ stocksParRegion|length }} régions couvertes</span>
+    </div>
+
+    <div style="padding: 20px 24px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+            {% for r in stocksParRegion %}
+            {% set pct = grandTotalStock > 0 ? (r.disponible / grandTotalStock * 100) : 0 %}
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: 14px; padding: 18px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <div>
+                        <div style="font-weight: 700; font-size: 15px; color: #fff;">
+                            <i class="fa-solid fa-location-dot text-gold" style="margin-right: 6px;"></i> {{ r.nom }}
+                        </div>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+                            {{ r.sites|join(', ') }}
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div class="font-bold text-success" style="font-size: 16px;">
+                            {{ r.disponible|number_format(0, ',', ' ') }}
+                        </div>
+                        <div style="font-size: 11px; color: var(--text-gold);">
+                            {{ pct|number_format(1) }} % du stock global
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Progress Bar -->
+                <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.08); border-radius: 999px; overflow: hidden; margin-top: 12px;">
+                    <div style="width: {{ pct }}%; height: 100%; background: linear-gradient(90deg, var(--primary), var(--gold)); border-radius: 999px;"></div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 11px; color: var(--text-muted);">
+                    <span>Réservé: <strong class="text-warning">{{ r.reservee|number_format(0, ',', ' ') }}</strong></span>
+                    <span>En transit: <strong class="text-info">{{ r.transit|number_format(0, ',', ' ') }}</strong></span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Dernières Commandes Reçues -->
+<div class="card-table">
+    <div class="card-table-header">
+        <div class="card-table-title"><i class="fa-solid fa-clock-rotate-left text-gold"></i> Dernières Commandes Reçues</div>
+        <a href="{{ path('app_commande_index') }}" class="btn btn-outline btn-sm"><i class="fa-solid fa-arrow-right"></i> Voir tout</a>
+    </div>
+
+    <table class="custom-table">
+        <thead>
+            <tr>
+                <th>N° Commande</th>
+                <th>Client / Grossiste</th>
+                <th>Date</th>
+                <th>Montant Total</th>
+                <th>Statut</th>
+                <th style="text-align: right;">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cmd in commandesRecentes %}
+            <tr>
+                <td class="font-bold">{{ cmd.numero }}</td>
+                <td>{{ cmd.clientNom }}</td>
+                <td>{{ cmd.dateCommande ? cmd.dateCommande|date('d/m/Y H:i') : '-' }}</td>
+                <td class="font-bold text-gold">{{ cmd.montantTotal|number_format(2, ',', ' ') }} $</td>
+                <td>
+                    {% if cmd.statut == 'VALIDEE' %}
+                        <span class="badge badge-success">Validée</span>
+                    {% elseif cmd.statut == 'SOUMISE' %}
+                        <span class="badge badge-warning">Soumise</span>
+                    {% elseif cmd.statut == 'EXPEDIEE' %}
+                        <span class="badge badge-info">Expédiée</span>
+                    {% else %}
+                        <span class="badge badge-primary">{{ cmd.statut }}</span>
+                    {% endif %}
+                </td>
+                <td style="text-align: right;">
+                    <a href="{{ path('app_commande_show', {id: cmd.id}) }}" class="btn btn-outline btn-sm"><i class="fa-solid fa-eye"></i></a>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 32px;">Aucune commande enregistrée.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Aperçu des Stocks par Site -->
+<div class="card-table">
+    <div class="card-table-header">
+        <div class="card-table-title"><i class="fa-solid fa-boxes-stacked text-gold"></i> Aperçu des Stocks Disponibles par Dépôt / Usine</div>
+        <a href="{{ path('app_stock_index') }}" class="btn btn-outline btn-sm"><i class="fa-solid fa-arrow-right"></i> Consulter tous les dépôts</a>
+    </div>
+
+    <table class="custom-table">
+        <thead>
+            <tr>
+                <th>Site / Emplacement</th>
+                <th>Produit</th>
+                <th>Lot</th>
+                <th>Quantité Dispo</th>
+                <th>Réservé</th>
+                <th>En Transit</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in stocksDispo %}
+            <tr>
+                <td class="font-bold">{{ s.emplacement ? s.emplacement.nom : 'Site' }}</td>
+                <td>{{ s.produit ? s.produit.nom : '-' }}</td>
+                <td><span class="badge badge-gold">{{ s.lot ? s.lot.numeroLot : 'N/A' }}</span></td>
+                <td class="font-bold text-success">{{ s.quantiteDisponible }}</td>
+                <td class="text-warning">{{ s.quantiteReservee }}</td>
+                <td class="text-info">{{ s.quantiteTransit }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 32px;">Aucun stock calculé pour l'instant.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% block body_end %}{% endblock %}
+{% endblock %}

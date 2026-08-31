@@ -1,0 +1,185 @@
+{% extends 'base/base.html.twig' %}
+
+{% block page_title %}Distribution Directe & Consignations DR{% endblock %}
+{% block page_subtitle %}Prélèvements de stock en consignation, double validation (Superviseur & ASM) et clôture de journée (Cash & Invendus){% endblock %}
+
+{% block body %}
+<div class="card-table">
+    <div class="card-table-header">
+        <div class="card-table-title"><i class="fa-solid fa-clipboard-check text-gold"></i> Consignations & Tournées DR</div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <span class="badge badge-gold">{{ consignations|length }} demandes</span>
+            <button onclick="openModal('modalAddConsignation')" class="btn btn-gold btn-sm"><i class="fa-solid fa-plus"></i> Nouvelle Demande Prélèvement</button>
+        </div>
+    </div>
+
+    <table class="custom-table">
+        <thead>
+            <tr>
+                <th>N° Consignation</th>
+                <th>Délégué (DR)</th>
+                <th>Dépôt Source</th>
+                <th>Date Demande</th>
+                <th>Double Validation</th>
+                <th>Cash Justifié</th>
+                <th>Statut</th>
+                <th style="text-align: right;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in consignations %}
+            <tr>
+                <td class="font-bold text-gold">{{ c.numero }}</td>
+                <td class="font-bold">{{ c.dr and c.dr.utilisateur ? c.dr.utilisateur.nomComplet : 'DR' }}</td>
+                <td>{{ c.depot ? c.depot.nom : '-' }}</td>
+                <td>{{ c.dateDemande ? c.dateDemande|date('d/m/Y H:i') : '-' }}</td>
+                <td>
+                    <div style="display: flex; flex-direction: column; gap: 4px; font-size: 11px;">
+                        {% if c.dateValidationSuperviseur %}
+                            <span class="badge badge-success" style="padding: 2px 8px;"><i class="fa-solid fa-check"></i> Superviseur OK</span>
+                        {% else %}
+                            <span class="badge badge-warning" style="padding: 2px 8px;">Superviseur en attente</span>
+                        {% endif %}
+                        {% if c.dateValidationAsm %}
+                            <span class="badge badge-success" style="padding: 2px 8px;"><i class="fa-solid fa-check-double"></i> ASM OK</span>
+                        {% else %}
+                            <span class="badge badge-warning" style="padding: 2px 8px;">ASM en attente</span>
+                        {% endif %}
+                    </div>
+                </td>
+                <td class="font-bold text-success">{{ c.cashJustifie|number_format(2, ',', ' ') }} $</td>
+                <td>
+                    {% if c.statut == 'CLOTUREE' %}
+                        <span class="badge badge-success"><i class="fa-solid fa-flag-checkered"></i> Clôturée (Journée terminée)</span>
+                    {% elseif c.statut == 'VALIDEE_ASM' %}
+                        <span class="badge badge-info"><i class="fa-solid fa-truck-ramp-box"></i> En tournée (Consignation)</span>
+                    {% elseif c.statut == 'VALIDEE_SUPERVISEUR' %}
+                        <span class="badge badge-warning">Validé Superviseur</span>
+                    {% else %}
+                        <span class="badge badge-primary">Soumise</span>
+                    {% endif %}
+                </td>
+                <td style="text-align: right; white-space: nowrap;">
+                    {% if c.statut == 'SOUMISE' %}
+                        <form method="post" action="{{ path('app_consignation_valider_superviseur', {id: c.id}) }}" style="display:inline;">
+                            <button type="submit" class="btn btn-warning btn-sm" title="Valider Niveau 1 (Superviseur)"><i class="fa-solid fa-user-check"></i> Valider Superviseur</button>
+                        </form>
+                    {% endif %}
+
+                    {% if c.statut in ['SOUMISE', 'VALIDEE_SUPERVISEUR'] %}
+                        <form method="post" action="{{ path('app_consignation_valider_asm', {id: c.id}) }}" style="display:inline;">
+                            <button type="submit" class="btn btn-primary btn-sm" title="Valider Niveau 2 (ASM) & Sortir Stock"><i class="fa-solid fa-check-double"></i> Valider ASM</button>
+                        </form>
+                    {% endif %}
+
+                    {% if c.statut == 'VALIDEE_ASM' %}
+                        <button onclick="openModal('modalCloturerConsignation{{ c.id }}')" class="btn btn-gold btn-sm" title="Clôturer la journée"><i class="fa-solid fa-file-invoice-dollar"></i> Clôture Journée</button>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 32px;">Aucune demande de prélèvement enregistrée.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Modal Add Demande Consignation -->
+<div id="modalAddConsignation" class="modal-backdrop">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-clipboard-list text-gold"></i> Nouvelle Demande de Prélèvement (DR)</div>
+            <button onclick="closeModal('modalAddConsignation')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="post" action="{{ path('app_consignation_nouveau') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Délégué Commercial (DR) *</label>
+                    <select name="dr_id" class="form-select" required>
+                        <option value="">-- Sélectionner le DR --</option>
+                        {% for a in agents %}
+                            <option value="{{ a.id }}">{{ a.utilisateur ? a.utilisateur.nomComplet ~ ' (' ~ a.typeAgentLibelle ~ ')' : 'Agent #' ~ a.id }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Dépôt Source de Prélèvement *</label>
+                        <select name="depot_id" class="form-select" required>
+                            <option value="">-- Sélectionner le dépôt --</option>
+                            {% for d in depots %}
+                                <option value="{{ d.id }}">{{ d.nom }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Produit *</label>
+                        <select name="produit_id" class="form-select" required>
+                            <option value="">-- Sélectionner le produit --</option>
+                            {% for p in produits %}
+                                <option value="{{ p.id }}">{{ p.nom }} (Code: {{ p.code }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Quantité Demandée pour la tournée *</label>
+                    <input type="number" step="0.001" name="quantite" class="form-control" placeholder="ex: 200" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Observations / Objectifs Tournée</label>
+                    <textarea name="observation" class="form-control" rows="2" placeholder="Tournée secteur Nord auprès des grossistes et cyclos..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('modalAddConsignation')" class="btn btn-outline">Annuler</button>
+                <button type="submit" class="btn btn-gold"><i class="fa-solid fa-paper-plane"></i> Soumettre pour Validation</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modals Clôture Journée DR (Rendered Outside Table) -->
+{% for c in consignations %}
+{% if c.statut == 'VALIDEE_ASM' %}
+<div id="modalCloturerConsignation{{ c.id }}" class="modal-backdrop">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-calculator text-gold"></i> Clôture & Justification de Journée — {{ c.numero }}</div>
+            <button onclick="closeModal('modalCloturerConsignation{{ c.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="post" action="{{ path('app_consignation_cloturer', {id: c.id}) }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">DR</label>
+                    <input type="text" class="form-control" value="{{ c.dr and c.dr.utilisateur ? c.dr.utilisateur.nomComplet : '' }}" disabled>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Cash Total Encaissé à la Caisse ($) *</label>
+                    <input type="number" step="0.01" name="cashJustifie" class="form-control" placeholder="ex: 1500.00" required>
+                </div>
+                
+                <div style="margin-top: 16px; font-weight: 700; font-size: 13px; color: var(--text-gold); margin-bottom: 8px;">Détail des Invendus & Ventes :</div>
+                {% for l in c.lignes %}
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Quantité Vendue ({{ l.produit ? l.produit.nom : '' }})</label>
+                        <input type="number" step="0.001" name="quantiteVendue_{{ l.id }}" class="form-control" value="{{ l.quantiteAccordee }}">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Invendus à réintégrer au stock</label>
+                        <input type="number" step="0.001" name="quantiteRetournee_{{ l.id }}" class="form-control" value="0.000">
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('modalCloturerConsignation{{ c.id }}')" class="btn btn-outline">Annuler</button>
+                <button type="submit" class="btn btn-gold"><i class="fa-solid fa-check"></i> Valider Clôture & Réintégrer Invendus</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endfor %}
+{% endblock %}

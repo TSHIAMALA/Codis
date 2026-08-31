@@ -1,0 +1,574 @@
+{% extends 'base/base.html.twig' %}
+
+{% block page_title %}
+    {% if activeTab == 'grossistes' %}
+        Grossistes Agréés — Réseau Commercial
+    {% elseif activeTab == 'detailants' %}
+        Détaillants & Points de Vente — Réseau Commercial
+    {% elseif activeTab == 'agents' %}
+        Agents Commerciaux Terrain — Réseau Commercial
+    {% else %}
+        Réseau Commercial & Distribution
+    {% endif %}
+{% endblock %}
+
+{% block page_subtitle %}
+    {% if activeTab == 'grossistes' %}
+        Gestion des partenaires grossistes agréés, plafonds de crédit et encours
+    {% elseif activeTab == 'detailants' %}
+        Gestion du portefeuille clients détaillants, prospection et points de vente
+    {% elseif activeTab == 'agents' %}
+        Supervision des agents commerciaux et délégués régionaux de distribution
+    {% else %}
+        Grossistes agréés, délégués régionaux, agents commerciaux et portefeuilles détaillants
+    {% endif %}
+{% endblock %}
+
+{% block body %}
+<!-- Tab Filter Bar -->
+<div style="display: flex; gap: 12px; margin-bottom: 28px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 16px; flex-wrap: wrap;">
+    <a href="{{ path('app_commercial_index', {tab: 'grossistes'}) }}" class="btn {% if activeTab == 'grossistes' %}btn-gold{% else %}btn-outline{% endif %} btn-sm">
+        <i class="fa-solid fa-building"></i> Grossistes Agréés ({{ grossistes|length }})
+    </a>
+    <a href="{{ path('app_commercial_index', {tab: 'detailants'}) }}" class="btn {% if activeTab == 'detailants' %}btn-gold{% else %}btn-outline{% endif %} btn-sm">
+        <i class="fa-solid fa-shop"></i> Détaillants & Points de Vente ({{ detailants|length }})
+    </a>
+    <a href="{{ path('app_commercial_index', {tab: 'agents'}) }}" class="btn {% if activeTab == 'agents' %}btn-gold{% else %}btn-outline{% endif %} btn-sm">
+        <i class="fa-solid fa-users"></i> Agents Terrain ({{ agents|length }})
+    </a>
+</div>
+
+{% if activeTab == 'grossistes' or activeTab == 'all' %}
+<!-- Grossistes Section -->
+<div class="card-table" id="grossistes">
+    <div class="card-table-header">
+        <div class="card-table-title"><i class="fa-solid fa-building text-gold"></i> Grossistes Agréés</div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <span class="badge badge-gold">{{ grossistes|length }} partenaires</span>
+            <button onclick="openModal('modalAddGrossiste')" class="btn btn-gold btn-sm"><i class="fa-solid fa-plus"></i> Nouveau Grossiste</button>
+        </div>
+    </div>
+
+    <table class="custom-table">
+        <thead>
+            <tr>
+                <th>Code</th>
+                <th>Raison Sociale</th>
+                <th>Responsable</th>
+                <th>Téléphone</th>
+                <th>Limite de Crédit</th>
+                <th>Statut</th>
+                <th style="text-align: right;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for g in grossistes %}
+            <tr>
+                <td class="font-bold">{{ g.code }}</td>
+                <td class="font-bold">{{ g.raisonSociale }}</td>
+                <td>{{ g.nomResponsable }}</td>
+                <td>{{ g.telephone }}</td>
+                <td class="font-bold text-gold">{{ g.limiteCredit|number_format(2, ',', ' ') }} $</td>
+                <td>
+                    {% if g.statut == 'ACTIF' %}
+                        <span class="badge badge-success">Actif</span>
+                    {% elseif g.statut == 'SUSPENDU' %}
+                        <span class="badge badge-warning">Suspendu</span>
+                    {% else %}
+                        <span class="badge badge-danger">{{ g.statut }}</span>
+                    {% endif %}
+                </td>
+                <td style="text-align: right;">
+                    <button onclick="openModal('modalEditGrossiste{{ g.id }}')" class="btn btn-outline btn-sm" title="Modifier"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button onclick="openModal('modalDeleteGrossiste{{ g.id }}')" class="btn btn-danger btn-sm" title="Suppression logique"><i class="fa-solid fa-trash-can"></i></button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Grossistes Modals (Rendered Outside Table) -->
+{% for g in grossistes %}
+<div id="modalEditGrossiste{{ g.id }}" class="modal-backdrop">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-pen-to-square text-gold"></i> Modifier Grossiste — {{ g.raisonSociale }}</div>
+            <button onclick="closeModal('modalEditGrossiste{{ g.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="post" action="{{ path('app_grossiste_modifier', {id: g.id}) }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Raison Sociale</label>
+                    <input type="text" name="raisonSociale" class="form-control" value="{{ g.raisonSociale }}" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Nom du Responsable</label>
+                        <input type="text" name="nomResponsable" class="form-control" value="{{ g.nomResponsable }}">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Téléphone</label>
+                        <input type="text" name="telephone" class="form-control" value="{{ g.telephone }}">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input type="email" name="email" class="form-control" value="{{ g.email }}">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Limite de Crédit ($)</label>
+                        <input type="number" step="0.01" name="limiteCredit" class="form-control" value="{{ g.limiteCredit }}">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Adresse</label>
+                    <input type="text" name="adresse" class="form-control" value="{{ g.adresse }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Statut</label>
+                    <select name="statut" class="form-select">
+                        <option value="ACTIF" {% if g.statut == 'ACTIF' %}selected{% endif %}>ACTIF</option>
+                        <option value="SUSPENDU" {% if g.statut == 'SUSPENDU' %}selected{% endif %}>SUSPENDU</option>
+                        <option value="EN_ATTENTE" {% if g.statut == 'EN_ATTENTE' %}selected{% endif %}>EN_ATTENTE</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('modalEditGrossiste{{ g.id }}')" class="btn btn-outline">Annuler</button>
+                <button type="submit" class="btn btn-gold"><i class="fa-solid fa-floppy-disk"></i> Enregistrer</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="modalDeleteGrossiste{{ g.id }}" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 450px;">
+        <div class="modal-header">
+            <div class="modal-title text-red"><i class="fa-solid fa-triangle-exclamation"></i> Suppression Logique</div>
+            <button onclick="closeModal('modalDeleteGrossiste{{ g.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="post" action="{{ path('app_grossiste_supprimer', {id: g.id}) }}">
+            <div class="modal-body">
+                <p style="font-size: 14px; line-height: 1.6; color: var(--text-main);">
+                    Voulez-vous désactiver le grossiste <strong class="text-gold">{{ g.raisonSociale }}</strong> ?
+                </p>
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
+                    L'enregistrement sera marqué comme <strong>INACTIF</strong> (suppression logique sans perte d'historique).
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('modalDeleteGrossiste{{ g.id }}')" class="btn btn-outline">Annuler</button>
+                <button type="submit" class="btn btn-danger"><i class="fa-solid fa-ban"></i> Confirmer Désactivation</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Modal Add Grossiste -->
+<div id="modalAddGrossiste" class="modal-backdrop">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-building-circle-check text-gold"></i> Ajouter un Grossiste Agréé</div>
+            <button onclick="closeModal('modalAddGrossiste')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="post" action="{{ path('app_grossiste_nouveau') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Raison Sociale *</label>
+                    <input type="text" name="raisonSociale" class="form-control" placeholder="ex: Ets BUMBA & FILS" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Nom du Responsable</label>
+                        <input type="text" name="nomResponsable" class="form-control" placeholder="ex: Jean Bumba">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Téléphone</label>
+                        <input type="text" name="telephone" class="form-control" placeholder="ex: +243 810 000 000">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input type="email" name="email" class="form-control" placeholder="contact@bumba.cd">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Limite de Crédit ($)</label>
+                        <input type="number" step="0.01" name="limiteCredit" class="form-control" value="10000.00">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Pays</label>
+                    <select name="pays_id" class="form-select">
+                        {% for p in paysList %}
+                            <option value="{{ p.id }}">{{ p.nom }} ({{ p.devise }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Adresse physique</label>
+                    <input type="text" name="adresse" class="form-control" placeholder="Av. du Marché, N° 12">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('modalAddGrossiste')" class="btn btn-outline">Annuler</button>
+                <button type="submit" class="btn btn-gold"><i class="fa-solid fa-plus"></i> Créer Grossiste</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+{% if activeTab in ['all', 'detailants'] %}
+<!-- Detailants Section -->
+<div class="card-table" id="detailants">
+    <div class="card-table-header">
+        <div class="card-table-title"><i class="fa-solid fa-shop text-gold"></i> Détaillants & Points de Vente</div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <span class="badge badge-gold">{{ detailants|length }} clients</span>
+            <button onclick="openModal('modalAddDetailant')" class="btn btn-gold btn-sm"><i class="fa-solid fa-plus"></i> Nouveau Détaillant</button>
+        </div>
+    </div>
+
+    <table class="custom-table">
+        <thead>
+            <tr>
+                <th>Code</th>
+                <th>Point de Vente</th>
+                <th>Responsable</th>
+                <th>Téléphone</th>
+                <th>Adresse</th>
+                <th>Statut</th>
+                <th style="text-align: right;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for d in detailants %}
+            <tr>
+                <td class="font-bold">{{ d.code }}</td>
+                <td class="font-bold">{{ d.nom }}</td>
+                <td>{{ d.nomResponsable }}</td>
+                <td>{{ d.telephone }}</td>
+                <td>{{ d.adresse }}</td>
+                <td>
+                    {% if d.statut == 'ACTIF' %}
+                        <span class="badge badge-success">Actif</span>
+                    {% else %}
+                        <span class="badge badge-warning">{{ d.statut }}</span>
+                    {% endif %}
+                </td>
+                <td style="text-align: right;">
+                    <button onclick="openModal('modalEditDetailant{{ d.id }}')" class="btn btn-outline btn-sm" title="Modifier"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button onclick="openModal('modalDeleteDetailant{{ d.id }}')" class="btn btn-danger btn-sm" title="Suppression logique"><i class="fa-solid fa-trash-can"></i></button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Detailants Modals (Rendered Outside Table) -->
+{% for d in detailants %}
+<div id="modalEditDetailant{{ d.id }}" class="modal-backdrop">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-pen-to-square text-gold"></i> Modifier Détaillant — {{ d.nom }}</div>
+            <button onclick="closeModal('modalEditDetailant{{ d.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="post" action="{{ path('app_detailant_modifier', {id: d.id}) }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Nom / Enseigne Point de Vente</label>
+                    <input type="text" name="nom" class="form-control" value="{{ d.nom }}" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Responsable</label>
+                        <input type="text" name="nomResponsable" class="form-control" value="{{ d.nomResponsable }}">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Téléphone</label>
+                        <input type="text" name="telephone" class="form-control" value="{{ d.telephone }}">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" name="email" class="form-control" value="{{ d.email }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Adresse</label>
+                    <input type="text" name="adresse" class="form-control" value="{{ d.adresse }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Statut</label>
+                    <select name="statut" class="form-select">
+                        <option value="ACTIF" {% if d.statut == 'ACTIF' %}selected{% endif %}>ACTIF</option>
+                        <option value="SUSPENDU" {% if d.statut == 'SUSPENDU' %}selected{% endif %}>SUSPENDU</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('modalEditDetailant{{ d.id }}')" class="btn btn-outline">Annuler</button>
+                <button type="submit" class="btn btn-gold"><i class="fa-solid fa-floppy-disk"></i> Enregistrer</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="modalDeleteDetailant{{ d.id }}" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 450px;">
+        <div class="modal-header">
+            <div class="modal-title text-red"><i class="fa-solid fa-triangle-exclamation"></i> Suppression Logique</div>
+            <button onclick="closeModal('modalDeleteDetailant{{ d.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="post" action="{{ path('app_detailant_supprimer', {id: d.id}) }}">
+            <div class="modal-body">
+                <p style="font-size: 14px; line-height: 1.6; color: var(--text-main);">
+                    Voulez-vous désactiver le détaillant <strong class="text-gold">{{ d.nom }}</strong> ?
+                </p>
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
+                    L'enregistrement sera marqué comme <strong>INACTIF</strong> (suppression logique sans perte d'historique).
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('modalDeleteDetailant{{ d.id }}')" class="btn btn-outline">Annuler</button>
+                <button type="submit" class="btn btn-danger"><i class="fa-solid fa-ban"></i> Confirmer Désactivation</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Modal Add Detailant -->
+<div id="modalAddDetailant" class="modal-backdrop">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-shop text-gold"></i> Nouveau Point de Vente / Détaillant</div>
+            <button onclick="closeModal('modalAddDetailant')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="post" action="{{ path('app_detailant_nouveau') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Nom / Enseigne *</label>
+                    <input type="text" name="nom" class="form-control" placeholder="ex: Alimentation Générale Kintambo" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Nom du Responsable</label>
+                        <input type="text" name="nomResponsable" class="form-control" placeholder="ex: M. Kabamba">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Téléphone</label>
+                        <input type="text" name="telephone" class="form-control" placeholder="ex: +243 990 000 000">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" name="email" class="form-control" placeholder="kintambo@gmail.com">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Adresse Physique</label>
+                    <input type="text" name="adresse" class="form-control" placeholder="Av. Kasavubu, N° 45">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('modalAddDetailant')" class="btn btn-outline">Annuler</button>
+                <button type="submit" class="btn btn-gold"><i class="fa-solid fa-plus"></i> Enregistrer Détaillant</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+{% if activeTab in ['all', 'agents'] %}
+<!-- Agents Section -->
+<div class="card-table" id="agents">
+    <div class="card-table-header">
+        <div class="card-table-title"><i class="fa-solid fa-users text-gold"></i> Agents Commerciaux Terrain</div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <span class="badge badge-gold">{{ agents|length }} agents</span>
+            <button onclick="openModal('modalAddAgent')" class="btn btn-gold btn-sm"><i class="fa-solid fa-user-plus"></i> Nouveau Agent</button>
+        </div>
+    </div>
+
+    <table class="custom-table">
+        <thead>
+            <tr>
+                <th>Nom & Prénom</th>
+                <th>Username</th>
+                <th>Pays / Région</th>
+                <th>Délégué Superviseur</th>
+                <th>Statut</th>
+                <th style="text-align: right;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for a in agents %}
+            <tr>
+                <td class="font-bold">{{ a.utilisateur ? a.utilisateur.nomComplet : '-' }}</td>
+                <td>{{ a.utilisateur ? a.utilisateur.username : '-' }}</td>
+                <td>{{ a.pays ? a.pays.nom : '' }} ({{ a.region ? a.region.nom : '' }})</td>
+                <td>{{ a.delegue and a.delegue.utilisateur ? a.delegue.utilisateur.nomComplet : 'Direct' }}</td>
+                <td>
+                    {% if a.actif %}
+                        <span class="badge badge-success">Actif</span>
+                    {% else %}
+                        <span class="badge badge-danger">Inactif</span>
+                    {% endif %}
+                </td>
+                <td style="text-align: right;">
+                    <button onclick="openModal('modalEditAgent{{ a.id }}')" class="btn btn-outline btn-sm" title="Modifier"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button onclick="openModal('modalDeleteAgent{{ a.id }}')" class="btn btn-danger btn-sm" title="Suppression logique"><i class="fa-solid fa-user-slash"></i></button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Agents Modals (Rendered Outside Table) -->
+{% for a in agents %}
+<div id="modalEditAgent{{ a.id }}" class="modal-backdrop">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-user-pen text-gold"></i> Modifier Agent Commercial — {{ a.utilisateur ? a.utilisateur.nomComplet : '' }}</div>
+            <button onclick="closeModal('modalEditAgent{{ a.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="post" action="{{ path('app_agent_modifier', {id: a.id}) }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Compte Utilisateur</label>
+                    <input type="text" class="form-control" value="{{ a.utilisateur ? a.utilisateur.nomComplet ~ ' (' ~ a.utilisateur.username ~ ')' : '' }}" disabled>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Délégué Superviseur</label>
+                        <select name="delegue_id" class="form-select">
+                            <option value="">-- Aucun (Direct) --</option>
+                            {% for del in delegues %}
+                                <option value="{{ del.id }}" {% if a.delegue and a.delegue.id == del.id %}selected{% endif %}>
+                                    {{ del.utilisateur ? del.utilisateur.nomComplet : 'Délégué #' ~ del.id }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Pays de rattachement</label>
+                        <select name="pays_id" class="form-select">
+                            {% for p in paysList %}
+                                <option value="{{ p.id }}" {% if a.pays and a.pays.id == p.id %}selected{% endif %}>{{ p.nom }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Statut</label>
+                    <select name="actif" class="form-select">
+                        <option value="1" {% if a.actif %}selected{% endif %}>ACTIF</option>
+                        <option value="0" {% if not a.actif %}selected{% endif %}>INACTIF</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('modalEditAgent{{ a.id }}')" class="btn btn-outline">Annuler</button>
+                <button type="submit" class="btn btn-gold"><i class="fa-solid fa-floppy-disk"></i> Enregistrer</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="modalDeleteAgent{{ a.id }}" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 450px;">
+        <div class="modal-header">
+            <div class="modal-title text-red"><i class="fa-solid fa-triangle-exclamation"></i> Désactivation d'Agent</div>
+            <button onclick="closeModal('modalDeleteAgent{{ a.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="post" action="{{ path('app_agent_supprimer', {id: a.id}) }}">
+            <div class="modal-body">
+                <p style="font-size: 14px; line-height: 1.6; color: var(--text-main);">
+                    Voulez-vous désactiver l'agent commercial <strong class="text-gold">{{ a.utilisateur ? a.utilisateur.nomComplet : '' }}</strong> ?
+                </p>
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
+                    L'agent sera marqué comme <strong>INACTIF</strong> (suppression logique sans perte d'historique).
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('modalDeleteAgent{{ a.id }}')" class="btn btn-outline">Annuler</button>
+                <button type="submit" class="btn btn-danger"><i class="fa-solid fa-user-slash"></i> Confirmer Désactivation</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Modal Add Agent -->
+<div id="modalAddAgent" class="modal-backdrop">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-user-plus text-gold"></i> Créer un Agent Commercial Terrain</div>
+            <button onclick="closeModal('modalAddAgent')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="post" action="{{ path('app_agent_nouveau') }}">
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Nom *</label>
+                        <input type="text" name="nom" class="form-control" placeholder="ex: ILUNGA" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Prénom</label>
+                        <input type="text" name="prenom" class="form-control" placeholder="ex: Patrick">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Nom d'utilisateur *</label>
+                        <input type="text" name="username" class="form-control" placeholder="ex: pilunga" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Mot de Passe par défaut</label>
+                        <input type="password" name="password" class="form-control" value="agent123">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input type="email" name="email" class="form-control" placeholder="patrick@codis.cd">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Téléphone</label>
+                        <input type="text" name="telephone" class="form-control" placeholder="+243 810 000 000">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Délégué Superviseur</label>
+                        <select name="delegue_id" class="form-select">
+                            <option value="">-- Aucun (Direct) --</option>
+                            {% for del in delegues %}
+                                <option value="{{ del.id }}">{{ del.utilisateur ? del.utilisateur.nomComplet : 'Délégué #' ~ del.id }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Pays</label>
+                        <select name="pays_id" class="form-select">
+                            {% for p in paysList %}
+                                <option value="{{ p.id }}">{{ p.nom }} ({{ p.devise }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('modalAddAgent')" class="btn btn-outline">Annuler</button>
+                <button type="submit" class="btn btn-gold"><i class="fa-solid fa-user-check"></i> Créer Agent Commercial</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

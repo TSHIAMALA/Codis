@@ -1,0 +1,216 @@
+{% extends 'base/base.html.twig' %}
+
+{% block page_title %}Commande {{ commande.numero }}{% endblock %}
+{% block page_subtitle %}Détail de la commande, bon de livraison et statut des règlements{% endblock %}
+
+{% block body %}
+{% set isDistAgree = commande.grossiste and commande.grossiste.typeDistribution is defined and commande.grossiste.typeDistribution == 'DISTRIBUTEUR_AGREE' %}
+{% set totalPaye = 0 %}
+{% for p in commande.paiements %}
+    {% if p.statut == 'VALIDE' %}
+        {% set totalPaye = totalPaye + p.montant %}
+    {% endif %}
+{% endfor %}
+{% set montantCmd = commande.montantTotal|default('0') %}
+{% set estPaye = (totalPaye|number_format(2) >= montantCmd|number_format(2)) %}
+{% set excedent = totalPaye - montantCmd %}
+
+<div class="card-table">
+    <div class="card-table-header">
+        <div class="card-table-title"><i class="fa-solid fa-file-invoice"></i> Informations Générales</div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            {% if commande.statut in ['SOUMISE', 'BROUILLON'] %}
+            <form method="post" action="{{ path('app_commande_valider', {id: commande.id}) }}" style="display:inline;">
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check-double"></i> Valider la commande et générer BL</button>
+            </form>
+            {% endif %}
+            <a href="{{ path('app_commande_index') }}" class="btn btn-outline btn-sm"><i class="fa-solid fa-arrow-left"></i> Retour aux commandes</a>
+        </div>
+    </div>
+
+    <div class="detail-grid">
+        <div class="detail-item">
+            <div class="detail-label">Client</div>
+            <div class="detail-value font-bold">{{ commande.clientNom }}</div>
+            {% if isDistAgree %}
+                <span class="badge badge-gold" style="margin-top: 4px; font-size: 10px;">Distributeur Agréé (Distribution Indirecte)</span>
+            {% endif %}
+        </div>
+        <div class="detail-item">
+            <div class="detail-label">Date Commande</div>
+            <div class="detail-value">{{ commande.dateCommande ? commande.dateCommande|date('d/m/Y H:i') : '-' }}</div>
+        </div>
+        <div class="detail-item">
+            <div class="detail-label">Statut Logistique</div>
+            <div class="detail-value">
+                {% if commande.statut == 'VALIDEE' %}
+                    <span class="badge badge-success">Validée</span>
+                {% elseif commande.statut == 'SOUMISE' %}
+                    <span class="badge badge-warning">En attente validation</span>
+                {% elseif commande.statut == 'EN_PREPARATION' %}
+                    <span class="badge badge-warning">En préparation</span>
+                {% elseif commande.statut == 'EXPEDIEE' %}
+                    <span class="badge badge-info"><i class="fa-solid fa-truck"></i> Expédiée</span>
+                {% elseif commande.statut == 'RECEPTIONNEE' %}
+                    <span class="badge badge-success"><i class="fa-solid fa-check-double"></i> Réceptionnée</span>
+                {% elseif commande.statut == 'ANNULEE' %}
+                    <span class="badge badge-danger">Annulée</span>
+                {% else %}
+                    <span class="badge badge-primary">{{ commande.statut }}</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="detail-item">
+            <div class="detail-label">Montant Facturé</div>
+            <div class="detail-value highlight">{{ commande.montantTotal|number_format(2, ',', ' ') }} $</div>
+        </div>
+    </div>
+
+    <!-- Bannière État Financier & Excédents / Avoirs -->
+    <div style="margin: 0 24px 20px 24px; padding: 14px 18px; border-radius: 8px; {% if excedent > 0 %}background: rgba(34, 197, 94, 0.08); border-left: 4px solid var(--success);{% elseif estPaye %}background: rgba(34, 197, 94, 0.08); border-left: 4px solid var(--success);{% else %}background: rgba(220, 38, 38, 0.08); border-left: 4px solid var(--primary);{% endif %} display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <div style="font-weight: 700; color: #fff; font-size: 13px;">
+                {% if excedent > 0 %}
+                    <i class="fa-solid fa-piggy-bank text-gold" style="margin-right: 6px;"></i>
+                    Commande Soldée avec Excédent / Avoir Client : <span class="text-gold">+ {{ excedent|number_format(2, ',', ' ') }} $</span>
+                {% elseif estPaye %}
+                    <i class="fa-solid fa-check-circle text-success" style="margin-right: 6px;"></i>
+                    Commande Intégralement Réglée ({{ totalPaye|number_format(2, ',', ' ') }} $)
+                {% else %}
+                    <i class="fa-solid fa-triangle-exclamation text-red" style="margin-right: 6px;"></i>
+                    Paiement En Attente : Reste à payer <span class="text-gold">{{ (montantCmd - totalPaye)|number_format(2, ',', ' ') }} $</span>
+                {% endif %}
+            </div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+                Total payé à la caisse : <strong class="text-success">{{ totalPaye|number_format(2, ',', ' ') }} $</strong> sur {{ montantCmd|number_format(2, ',', ' ') }} $ 
+                {% if excedent > 0 %}
+                    — <em>Le surplus de {{ excedent|number_format(2, ',', ' ') }} $ est conservé comme avance/avoir pour le client.</em>
+                {% endif %}
+            </div>
+        </div>
+        <a href="{{ path('app_paiement_index') }}" class="btn btn-gold btn-sm"><i class="fa-solid fa-receipt"></i> Gérer Règlements</a>
+    </div>
+</div>
+
+<!-- Règlements Encaissés pour cette Commande -->
+{% if commande.paiements|length > 0 %}
+<div class="card-table">
+    <div class="card-table-header">
+        <div class="card-table-title"><i class="fa-solid fa-receipt text-gold"></i> Règlements Encaissés en Caisse</div>
+        <span class="badge badge-success">{{ commande.paiements|length }} versements (Total: {{ totalPaye|number_format(2, ',', ' ') }} $)</span>
+    </div>
+
+    <table class="custom-table">
+        <thead>
+            <tr>
+                <th>Date Paiement</th>
+                <th>Mode</th>
+                <th>Référence</th>
+                <th>Montant</th>
+                <th>Statut</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in commande.paiements %}
+            <tr>
+                <td>{{ p.datePaiement ? p.datePaiement|date('d/m/Y H:i') : '-' }}</td>
+                <td><span class="badge badge-gold">{{ p.modePaiement }}</span></td>
+                <td>{{ p.reference }}</td>
+                <td class="font-bold text-success">{{ p.montant|number_format(2, ',', ' ') }} $</td>
+                <td>
+                    {% if p.statut == 'VALIDE' %}
+                        <span class="badge badge-success">Validé</span>
+                    {% else %}
+                        <span class="badge badge-warning">{{ p.statut }}</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- Bons de Livraison Associés -->
+{% if commande.livraisons|length > 0 %}
+<div class="card-table">
+    <div class="card-table-header">
+        <div class="card-table-title"><i class="fa-solid fa-truck-fast text-gold"></i> Bons de Livraison Associés</div>
+        <a href="{{ path('app_livraison_index') }}" class="btn btn-outline btn-sm"><i class="fa-solid fa-arrow-right"></i> Voir tous les BL</a>
+    </div>
+
+    <table class="custom-table">
+        <thead>
+            <tr>
+                <th>N° BL</th>
+                <th>Dépôt Source</th>
+                <th>Date Prévue</th>
+                <th>Statut</th>
+                <th style="text-align: right;">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for l in commande.livraisons %}
+            <tr>
+                <td class="font-bold text-gold">{{ l.numero }}</td>
+                <td>{{ l.depot ? l.depot.nom : '-' }}</td>
+                <td>{{ l.datePrevue ? l.datePrevue|date('d/m/Y') : '-' }}</td>
+                <td>
+                    {% if l.statut == 'RECEPTION_CONFIRMEE' %}
+                        <span class="badge badge-success">Réception confirmée</span>
+                    {% elseif l.statut == 'EN_TRANSIT' %}
+                        <span class="badge badge-info"><i class="fa-solid fa-truck"></i> En transit</span>
+                    {% elseif l.statut == 'ANNULEE' %}
+                        <span class="badge badge-danger">Annulée</span>
+                    {% else %}
+                        <span class="badge badge-warning">{{ l.statut }}</span>
+                    {% endif %}
+                </td>
+                <td style="text-align: right;">
+                    {% if l.statut == 'PREPARATION' %}
+                        {% if isDistAgree and not estPaye %}
+                            <a href="{{ path('app_paiement_index') }}" class="btn btn-warning btn-sm" title="Paiement requis avant expédition"><i class="fa-solid fa-lock"></i> Paiement Caisse Requis</a>
+                        {% else %}
+                            <form method="post" action="{{ path('app_livraison_expedier', {id: l.id}) }}" style="display:inline;">
+                                <button type="submit" class="btn btn-primary btn-sm"><i class="fa-solid fa-paper-plane"></i> Expédier</button>
+                            </form>
+                        {% endif %}
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- Articles commandés -->
+<div class="card-table">
+    <div class="card-table-header">
+        <div class="card-table-title"><i class="fa-solid fa-list"></i> Articles commandés</div>
+    </div>
+
+    <table class="custom-table">
+        <thead>
+            <tr>
+                <th>Produit</th>
+                <th>Conditionnement</th>
+                <th>Quantité</th>
+                <th>Prix Unitaire</th>
+                <th>Montant</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for l in commande.lignes %}
+            <tr>
+                <td class="font-bold">{{ l.produit ? l.produit.nom : '-' }}</td>
+                <td>{{ l.conditionnement ? l.conditionnement.libelle : '-' }}</td>
+                <td class="font-bold">{{ l.quantite }}</td>
+                <td>{{ l.prixUnitaire|number_format(2, ',', ' ') }} $</td>
+                <td class="font-bold text-gold">{{ l.montant|number_format(2, ',', ' ') }} $</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
