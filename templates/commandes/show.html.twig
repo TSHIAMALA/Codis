@@ -69,7 +69,7 @@
     <!-- Bannière État Financier & Excédents / Avoirs -->
     <div style="margin: 0 24px 20px 24px; padding: 14px 18px; border-radius: 8px; {% if excedent > 0 %}background: rgba(34, 197, 94, 0.08); border-left: 4px solid var(--success);{% elseif estPaye %}background: rgba(34, 197, 94, 0.08); border-left: 4px solid var(--success);{% else %}background: rgba(220, 38, 38, 0.08); border-left: 4px solid var(--primary);{% endif %} display: flex; justify-content: space-between; align-items: center;">
         <div>
-            <div style="font-weight: 700; color: #fff; font-size: 13px;">
+            <div style="font-weight: 700; color: var(--text-main); font-size: 13px;">
                 {% if excedent > 0 %}
                     <i class="fa-solid fa-piggy-bank text-gold" style="margin-right: 6px;"></i>
                     Commande Soldée avec Excédent / Avoir Client : <span class="text-gold">+ {{ excedent|number_format(2, ',', ' ') }} $</span>
