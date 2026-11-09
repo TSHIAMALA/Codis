@@ -1,0 +1,41 @@
+{% extends 'base/base.html.twig' %}
+
+{% block title %}Accès refusé - CODIS{% endblock %}
+{% block page_title %}Accès refusé{% endblock %}
+{% block page_subtitle %}Cette page n'est pas disponible pour votre profil{% endblock %}
+
+{% block body %}
+<div class="card-table" style="max-width: 640px; margin: 40px auto; padding: 40px; text-align: center;">
+    <div style="font-size: 44px; color: #ef4444; margin-bottom: 16px;"><i class="fa-solid fa-lock"></i></div>
+    <h2 style="font-size: 20px; margin-bottom: 12px;">Vous n'avez pas accès à cette page</h2>
+    <p style="color: var(--text-muted); line-height: 1.6; margin-bottom: 8px;">
+        {% if message and message != 'Access Denied.' %}
+            {{ message }}
+        {% else %}
+            Votre rôle ne permet pas d'effectuer cette action.
+        {% endif %}
+    </p>
+
+    {% if app.user %}
+        {% set roleEntity = app.user.rolesEntities|first %}
+        <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 24px;">
+            Connecté en tant que <strong>{{ app.user.nomComplet }}</strong>
+            — rôle : <span class="role-chip">{{ roleEntity ? roleEntity.libelle : 'aucun rôle attribué' }}</span>
+        </p>
+
+        {% if not is_granted('ROLE_STAFF') %}
+            <p style="font-size: 13px; margin-bottom: 24px;">
+                L'interface web est réservée au personnel CODIS. Si vous êtes partenaire, utilisez l'application mobile
+                ou contactez votre délégué commercial.
+            </p>
+        {% endif %}
+    {% endif %}
+
+    <div style="display: flex; gap: 10px; justify-content: center;">
+        {% if is_granted('ROLE_STAFF') %}
+            <a href="{{ path('app_dashboard') }}" class="btn btn-gold"><i class="fa-solid fa-chart-pie"></i> Retour au tableau de bord</a>
+        {% endif %}
+        <a href="{{ logout_path() }}" class="btn btn-outline"><i class="fa-solid fa-right-from-bracket"></i> Changer de compte</a>
+    </div>
+</div>
+{% endblock %}

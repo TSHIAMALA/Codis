@@ -9,8 +9,10 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
+#[IsGranted('ROLE_STAFF')]
 #[Route('/catalogue')]
 class CatalogueController extends AbstractController
 {
@@ -28,6 +30,7 @@ class CatalogueController extends AbstractController
         ]);
     }
 
+    #[IsGranted('ROLE_ADMIN_PAYS')]
     #[Route('/categorie/nouveau', name: 'app_categorie_nouveau', methods: ['POST'])]
     public function nouveauCategorie(Request $request, EntityManagerInterface $em): Response
     {
@@ -55,6 +58,7 @@ class CatalogueController extends AbstractController
         return $this->redirectToRoute('app_catalogue_index');
     }
 
+    #[IsGranted('ROLE_ADMIN_PAYS')]
     #[Route('/produit/nouveau', name: 'app_produit_nouveau', methods: ['POST'])]
     public function nouveauProduit(Request $request, EntityManagerInterface $em): Response
     {

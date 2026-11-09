@@ -8,11 +8,12 @@ use Doctrine\Common\Collections\Collection;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'region')]
+#[ORM\UniqueConstraint(name: 'uk_region_pays_code', columns: ['pays_id', 'code'])]
 class Region
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
-    #[ORM\Column(type: 'bigint')]
+    #[ORM\Column(type: 'bigint', options: ['unsigned' => true])]
     private ?int $id = null;
 
     #[ORM\ManyToOne(targetEntity: Pays::class, inversedBy: 'regions')]

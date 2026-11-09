@@ -58,7 +58,7 @@
     <div class="card-table-header">
         <div class="card-table-title"><i class="fa-solid fa-receipt text-gold"></i> Historique des Règlements Encaissés</div>
         <div style="display: flex; gap: 10px; align-items: center;">
-            <span class="badge badge-gold">{{ paiements|length }} transactions</span>
+            <span class="badge badge-gold">{{ paiements.total }} transactions</span>
             <button onclick="openModal('modalAddPaiement')" class="btn btn-gold btn-sm"><i class="fa-solid fa-plus"></i> Enregistrer un Règlement</button>
         </div>
     </div>
@@ -102,6 +102,7 @@
             {% endfor %}
         </tbody>
     </table>
+    {{ include('_pagination.html.twig', {page: paiements}) }}
 </div>
 
 <!-- Paiements Modals (Rendered Outside Table) -->
@@ -113,6 +114,7 @@
             <button onclick="closeModal('modalEditPaiement{{ p.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <form method="post" action="{{ path('app_paiement_modifier', {id: p.id}) }}">
+            {{ include('_csrf.html.twig') }}
             <div class="modal-body">
                 <div class="form-row">
                     <div class="form-group">
@@ -153,6 +155,7 @@
             <button onclick="closeModal('modalDeletePaiement{{ p.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <form method="post" action="{{ path('app_paiement_supprimer', {id: p.id}) }}">
+            {{ include('_csrf.html.twig') }}
             <div class="modal-body">
                 <p style="font-size: 14px; line-height: 1.6; color: var(--text-main);">
                     Voulez-vous rejeter/invalider le paiement de <strong class="text-gold">{{ p.montant|number_format(2, ',', ' ') }} $</strong> pour la commande <strong class="text-gold">{{ p.commande ? p.commande.numero : '' }}</strong> ?
@@ -178,6 +181,7 @@
             <button onclick="closeModal('modalAddPaiement')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <form method="post" action="{{ path('app_paiement_nouveau') }}">
+            {{ include('_csrf.html.twig') }}
             <div class="modal-body">
                 <div class="form-group">
                     <label class="form-label">Commande Client *</label>

@@ -8,10 +8,24 @@
     <div class="card-table-header">
         <div class="card-table-title"><i class="fa-solid fa-cart-shopping"></i> Liste des Commandes</div>
         <div style="display: flex; gap: 10px; align-items: center;">
-            <span class="badge badge-gold">{{ commandes|length }} commandes</span>
+            <span class="badge badge-gold">{{ commandes.total }} commandes</span>
             <button onclick="openModal('modalAddCommande')" class="btn btn-gold btn-sm"><i class="fa-solid fa-plus"></i> Nouvelle Commande</button>
         </div>
     </div>
+
+    <form method="get" class="filtres" role="search">
+        <input type="search" name="q" value="{{ app.request.query.get('q') }}" class="form-control" placeholder="N° de commande ou client…" aria-label="Rechercher une commande">
+        <select name="statut" class="form-select" onchange="this.form.submit()" aria-label="Filtrer par statut">
+            <option value="">Tous les statuts</option>
+            {% for code, libelle in {SOUMISE: 'En attente validation', VALIDEE: 'Validée', EXPEDIEE: 'Expédiée', RECEPTIONNEE: 'Réceptionnée', ANNULEE: 'Annulée'} %}
+                <option value="{{ code }}" {% if app.request.query.get('statut') == code %}selected{% endif %}>{{ libelle }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-outline btn-sm"><i class="fa-solid fa-magnifying-glass"></i> Rechercher</button>
+        {% if app.request.query.get('q') or app.request.query.get('statut') %}
+            <a href="{{ path('app_commande_index') }}" class="filtres-reset"><i class="fa-solid fa-xmark"></i> Réinitialiser</a>
+        {% endif %}
+    </form>
 
     <table class="custom-table">
         <thead>
@@ -55,16 +69,17 @@
                     {% if cmd.statut in ['SOUMISE', 'BROUILLON'] %}
                         <button onclick="openModal('modalEditCommande{{ cmd.id }}')" class="btn btn-outline btn-sm" title="Modifier"><i class="fa-solid fa-pen-to-square"></i></button>
                     {% endif %}
-                    {% if cmd.statut not in ['ANNULEE', 'LIVREE', 'RECEPTIONNEE'] %}
+                    {% if workflow_can(cmd, 'annuler') and is_granted('ROLE_DELEGUE') %}
                         <button onclick="openModal('modalCancelCommande{{ cmd.id }}')" class="btn btn-danger btn-sm" title="Annuler (suppression logique)"><i class="fa-solid fa-ban"></i></button>
                     {% endif %}
                 </td>
             </tr>
             {% else %}
-            <tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 32px;">Aucune commande enregistrée.</td></tr>
+            <tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 32px;">{{ app.request.query.get('q') or app.request.query.get('statut') ? 'Aucune commande ne correspond aux filtres.' : 'Aucune commande enregistrée.' }}</td></tr>
             {% endfor %}
         </tbody>
     </table>
+    {{ include('_pagination.html.twig', {page: commandes}) }}
 </div>
 
 <!-- ========== MODAL: NOUVELLE COMMANDE ========== -->
@@ -75,6 +90,7 @@
             <button onclick="closeModal('modalAddCommande')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <form method="post" action="{{ path('app_commande_nouveau') }}" id="formNouvelleCommande">
+            {{ include('_csrf.html.twig') }}
             <div class="modal-body">
                 <!-- Type de commande -->
                 <div class="form-group">
@@ -128,7 +144,7 @@
                         <div class="ligne-commande" style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 10px; padding: 12px; background: var(--bg-card-subtle); border-radius: 10px; border: 1px solid var(--border-subtle);">
                             <div style="flex: 2;">
                                 <label class="form-label" style="font-size: 11px;">Produit *</label>
-                                <select name="produit_ids[]" class="form-select select-produit" required onchange="autoFillPrix(this)">
+                                <select name="produit_ids[]" class="form-select select-produit" required onchange="filtrerConditionnements(this); autoFillPrix(this)">
                                     <option value="">-- Produit --</option>
                                     {% for p in produits %}
                                         <option value="{{ p.id }}">{{ p.nom }} ({{ p.code }})</option>
@@ -136,11 +152,11 @@
                                 </select>
                             </div>
                             <div style="flex: 1.5;">
-                                <label class="form-label" style="font-size: 11px;">Conditionnement</label>
-                                <select name="conditionnement_ids[]" class="form-select select-cond" onchange="autoFillPrix(this)">
-                                    <option value="">-- Unité --</option>
+                                <label class="form-label" style="font-size: 11px;">Conditionnement *</label>
+                                <select name="conditionnement_ids[]" class="form-select select-cond" required onchange="autoFillPrix(this)">
+                                    <option value="">-- Choisir le produit d'abord --</option>
                                     {% for c in conditionnements %}
-                                        <option value="{{ c.id }}">{{ c.libelle }}</option>
+                                        <option value="{{ c.id }}" data-produit="{{ c.produit ? c.produit.id : '' }}" hidden>{{ c.libelle }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
@@ -150,10 +166,10 @@
                             </div>
                             <div style="flex: 1.2;">
                                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <label class="form-label" style="font-size: 11px;">Prix Unit. ($) *</label>
+                                    <label class="form-label" style="font-size: 11px;" title="Prix fixé automatiquement par la grille tarifaire">Prix Unit. ($) <i class="fa-solid fa-lock" style="font-size: 9px;"></i></label>
                                     <span class="badge-source-prix" style="font-size: 9px; color: var(--text-gold);"></span>
                                 </div>
-                                <input type="number" step="0.01" name="prix_unitaires[]" class="form-control input-pu" placeholder="P.U." required oninput="calculerMontantLigne(this)">
+                                <input type="number" step="0.01" class="form-control input-pu" placeholder="Auto" readonly tabindex="-1" style="background: var(--bg-card-subtle); cursor: not-allowed;">
                             </div>
                             <div style="flex: 0.9;">
                                 <label class="form-label" style="font-size: 11px;">Sous-total</label>
@@ -164,6 +180,8 @@
                             </div>
                         </div>
                     </div>
+
+                    <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;"><i class="fa-solid fa-circle-info"></i> Les prix proviennent de la grille tarifaire (zone, puis région, puis national) et sont recalculés à l'enregistrement.</p>
 
                     <!-- Montant Total -->
                     <div style="display: flex; justify-content: flex-end; margin-top: 12px; padding: 12px 16px; background: rgba(212, 160, 23, 0.08); border-radius: 10px; border: 1px solid rgba(212, 160, 23, 0.2);">
@@ -196,7 +214,8 @@
             <div class="modal-title"><i class="fa-solid fa-pen-to-square text-gold"></i> Modifier Commande {{ cmd.numero }}</div>
             <button onclick="closeModal('modalEditCommande{{ cmd.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <form method="post" action="{{ path('app_commande_edit', {id: cmd.id}) }}">
+        <form method="post" action="{{ path('app_commande_modifier', {id: cmd.id}) }}">
+            {{ include('_csrf.html.twig') }}
             <div class="modal-body">
                 <div class="form-group">
                     <label class="form-label">Client</label>
@@ -216,7 +235,7 @@
 </div>
 {% endif %}
 
-{% if cmd.statut not in ['ANNULEE', 'LIVREE', 'RECEPTIONNEE'] %}
+{% if workflow_can(cmd, 'annuler') %}
 <div id="modalCancelCommande{{ cmd.id }}" class="modal-backdrop">
     <div class="modal-content" style="max-width: 450px;">
         <div class="modal-header">
@@ -224,6 +243,7 @@
             <button onclick="closeModal('modalCancelCommande{{ cmd.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <form method="post" action="{{ path('app_commande_annuler', {id: cmd.id}) }}">
+            {{ include('_csrf.html.twig') }}
             <div class="modal-body">
                 <p style="font-size: 14px; line-height: 1.6; color: var(--text-main);">
                     Voulez-vous annuler la commande <strong class="text-gold">{{ cmd.numero }}</strong> ({{ cmd.clientNom }}) ?
@@ -271,19 +291,42 @@ function autoFillPrix(el) {
     fetch(url)
         .then(function(res) { return res.json(); })
         .then(function(data) {
+            var puInput = row.querySelector('.input-pu');
+            var badge = row.querySelector('.badge-source-prix');
             if (data.prix > 0) {
-                var puInput = row.querySelector('.input-pu');
                 puInput.value = data.prix;
-                var badge = row.querySelector('.badge-source-prix');
                 if (badge) {
+                    badge.style.color = 'var(--text-gold)';
                     badge.textContent = data.zone ? data.zone : (data.region ? data.region : 'Réf');
+                    badge.title = data.source || '';
                 }
-                calculerMontantLigne(puInput);
+            } else {
+                puInput.value = '';
+                if (badge) {
+                    badge.style.color = '#ef4444';
+                    badge.textContent = 'Aucun tarif';
+                    badge.title = 'Aucun tarif actif : cette ligne bloquera la commande';
+                }
             }
+            calculerMontantLigne(puInput);
         })
         .catch(function(err) {
             console.error('Erreur récupération tarif:', err);
         });
+}
+
+function filtrerConditionnements(selectProduit) {
+    var row = selectProduit.closest('.ligne-commande');
+    var selectCond = row.querySelector('.select-cond');
+    var visibles = [];
+    selectCond.querySelectorAll('option[data-produit]').forEach(function(opt) {
+        var ok = opt.dataset.produit === selectProduit.value;
+        opt.hidden = !ok;
+        if (ok) visibles.push(opt);
+    });
+    selectCond.options[0].textContent = selectProduit.value ? '-- Unité --' : "-- Choisir le produit d'abord --";
+    // Présélectionne l'unique conditionnement disponible
+    selectCond.value = visibles.length === 1 ? visibles[0].value : '';
 }
 
 function updateAllLignesPrix() {
@@ -303,6 +346,7 @@ function ajouterLigneCommande() {
     // Reset values
     clone.querySelectorAll('select').forEach(function(s) { s.selectedIndex = 0; });
     clone.querySelectorAll('input[type="number"]').forEach(function(i) { i.value = ''; });
+    clone.querySelectorAll('option[data-produit]').forEach(function(o) { o.hidden = true; });
     clone.querySelector('.sous-total-ligne').value = '0.00 $';
     var badge = clone.querySelector('.badge-source-prix');
     if (badge) badge.textContent = '';
@@ -321,7 +365,7 @@ function supprimerLigneCommande(btn) {
 function calculerMontantLigne(input) {
     var row = input.closest('.ligne-commande');
     var qte = parseFloat(row.querySelector('input[name="quantites[]"]').value) || 0;
-    var pu = parseFloat(row.querySelector('input[name="prix_unitaires[]"]').value) || 0;
+    var pu = parseFloat(row.querySelector('.input-pu').value) || 0;
     var sousTotal = qte * pu;
     row.querySelector('.sous-total-ligne').value = sousTotal.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' $';
     recalculerTotalCommande();
@@ -331,7 +375,7 @@ function recalculerTotalCommande() {
     var total = 0;
     document.querySelectorAll('.ligne-commande').forEach(function(row) {
         var qte = parseFloat(row.querySelector('input[name="quantites[]"]').value) || 0;
-        var pu = parseFloat(row.querySelector('input[name="prix_unitaires[]"]').value) || 0;
+        var pu = parseFloat(row.querySelector('.input-pu').value) || 0;
         total += qte * pu;
     });
     document.getElementById('totalCommandeDisplay').textContent = total.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' $';

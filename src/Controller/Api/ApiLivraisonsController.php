@@ -3,11 +3,14 @@
 namespace App\Controller\Api;
 
 use App\Entity\Livraison;
+use App\Exception\OperationImpossibleException;
+use App\Service\LivraisonService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/api')]
 class ApiLivraisonsController extends AbstractController
@@ -32,19 +35,18 @@ class ApiLivraisonsController extends AbstractController
         return new JsonResponse($res);
     }
 
+    #[IsGranted('ROLE_STAFF')]
     #[Route('/livraisons/{id}/confirmer', name: 'api_livraisons_confirmer', methods: ['POST'])]
-    public function confirmer(int $id, EntityManagerInterface $em): JsonResponse
+    public function confirmer(int $id, EntityManagerInterface $em, LivraisonService $livraisonService): JsonResponse
     {
         $l = $em->getRepository(Livraison::class)->find($id);
         if (!$l) return new JsonResponse(['error' => 'Livraison non trouvée'], 404);
 
-        $l->setStatut('RECEPTION_CONFIRMEE');
-        $l->setDateLivraison(new \DateTime());
-        if ($l->getCommande()) {
-            $l->getCommande()->setStatut('RECEPTIONNEE');
+        try {
+            $livraisonService->confirmerReception($l);
+        } catch (OperationImpossibleException $e) {
+            return new JsonResponse(['error' => $e->getMessage()], 409);
         }
-
-        $em->flush();
 
         return new JsonResponse(['success' => true, 'statut' => $l->getStatut()]);
     }

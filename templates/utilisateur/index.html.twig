@@ -4,6 +4,50 @@
 {% block page_subtitle %}Administration des comptes utilisateurs, accès et rôles système CODIS{% endblock %}
 
 {% block body %}
+{% if demandes is not empty %}
+<div class="card-table" style="margin-bottom: 24px; border: 1px solid rgba(245, 158, 11, 0.35);">
+    <div class="card-table-header">
+        <div class="card-table-title"><i class="fa-solid fa-user-clock" style="color: #f59e0b;"></i> Demandes d'accès en attente</div>
+        <span class="badge badge-warning">{{ demandes|length }} à traiter</span>
+    </div>
+    <table class="custom-table">
+        <thead>
+            <tr>
+                <th>Demandeur</th>
+                <th>Username</th>
+                <th>Contact</th>
+                <th>Pays</th>
+                <th>Reçue le</th>
+                <th style="text-align: right;">Décision</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for u in demandes %}
+            <tr>
+                <td class="font-bold">{{ u.nomComplet }}</td>
+                <td class="text-gold">{{ u.username }}</td>
+                <td>{{ u.email ?: '-' }}{% if u.telephone %}<br><span style="font-size: 12px; color: var(--text-muted);">{{ u.telephone }}</span>{% endif %}</td>
+                <td>{{ u.pays ? u.pays.nom : '-' }}</td>
+                <td>{{ u.createdAt ? u.createdAt|date('d/m/Y H:i') : '-' }}</td>
+                <td style="text-align: right;">
+                    <form method="post" action="{{ path('app_utilisateur_activer', {id: u.id}) }}" style="display: inline-flex; gap: 6px; align-items: center;">
+                        {{ include('_csrf.html.twig') }}
+                        <select name="role_id" class="form-select" required style="min-width: 190px; padding: 6px 10px; font-size: 12px;">
+                            <option value="">-- Rôle à attribuer --</option>
+                            {% for r in rolesList %}
+                                <option value="{{ r.id }}">{{ r.libelle }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-gold btn-sm" title="Accorder l'accès"><i class="fa-solid fa-check"></i> Accepter</button>
+                    </form>
+                    <button onclick="openModal('modalDeleteUtilisateur{{ u.id }}')" class="btn btn-danger btn-sm" title="Refuser la demande"><i class="fa-solid fa-xmark"></i></button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
 <div class="card-table">
     <div class="card-table-header">
         <div class="card-table-title"><i class="fa-solid fa-users-gear"></i> Comptes Utilisateurs</div>
@@ -35,8 +79,10 @@
                 <td>{{ u.telephone ? u.telephone : '-' }}</td>
                 <td>{{ u.pays ? u.pays.nom : '-' }}</td>
                 <td>
-                    {% for r in u.roles %}
-                        <span class="badge badge-gold" style="font-size: 10px; margin-right: 2px;">{{ r }}</span>
+                    {% for r in u.rolesEntities %}
+                        <span class="badge badge-gold" style="font-size: 10px; margin-right: 2px;" title="{{ r.code }}">{{ r.libelle }}</span>
+                    {% else %}
+                        <span class="badge badge-danger" style="font-size: 10px;">Aucun rôle</span>
                     {% endfor %}
                 </td>
                 <td>
@@ -47,9 +93,13 @@
                     {% endif %}
                 </td>
                 <td style="text-align: right;">
-                    <button onclick="openModal('modalEditUtilisateur{{ u.id }}')" class="btn btn-outline btn-sm" title="Modifier"><i class="fa-solid fa-pen-to-square"></i></button>
-                    {% if u.actif %}
-                        <button onclick="openModal('modalDeleteUtilisateur{{ u.id }}')" class="btn btn-danger btn-sm" title="Désactiver (suppression logique)"><i class="fa-solid fa-user-slash"></i></button>
+                    {% if is_granted('ROLE_SUPER_ADMIN') or 'ROLE_SUPER_ADMIN' not in u.roles %}
+                        <button onclick="openModal('modalEditUtilisateur{{ u.id }}')" class="btn btn-outline btn-sm" title="Modifier"><i class="fa-solid fa-pen-to-square"></i></button>
+                        {% if u.actif and u != app.user %}
+                            <button onclick="openModal('modalDeleteUtilisateur{{ u.id }}')" class="btn btn-danger btn-sm" title="Désactiver (suppression logique)"><i class="fa-solid fa-user-slash"></i></button>
+                        {% endif %}
+                    {% else %}
+                        <span style="font-size: 11px; color: var(--text-muted);" title="Réservé à un Administrateur général"><i class="fa-solid fa-lock"></i></span>
                     {% endif %}
                 </td>
             </tr>
@@ -67,6 +117,7 @@
             <button onclick="closeModal('modalEditUtilisateur{{ u.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <form method="post" action="{{ path('app_utilisateur_modifier', {id: u.id}) }}">
+            {{ include('_csrf.html.twig') }}
             <div class="modal-body">
                 <div class="form-row">
                     <div class="form-group">
@@ -90,14 +141,16 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">Nouveau Mot de Passe (laisser vide si inchangé)</label>
-                    <input type="password" name="password" class="form-control" placeholder="••••••••">
+                    <input type="password" name="password" class="form-control" placeholder="••••••••" minlength="8" autocomplete="new-password">
                 </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label">Rôle Système</label>
-                        <select name="role_id" class="form-select">
+                        {% set roleActuel = u.rolesEntities|first %}
+                        <select name="role_id" class="form-select" required>
+                            {% if not roleActuel %}<option value="">-- Choisir un rôle --</option>{% endif %}
                             {% for r in rolesList %}
-                                <option value="{{ r.id }}">{{ r.libelle }} ({{ r.code }})</option>
+                                <option value="{{ r.id }}" {% if roleActuel and roleActuel.id == r.id %}selected{% endif %}>{{ r.libelle }} ({{ r.code }})</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -126,6 +179,7 @@
             <button onclick="closeModal('modalDeleteUtilisateur{{ u.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <form method="post" action="{{ path('app_utilisateur_supprimer', {id: u.id}) }}">
+            {{ include('_csrf.html.twig') }}
             <div class="modal-body">
                 <p style="font-size: 14px; line-height: 1.6; color: var(--text-main);">
                     Voulez-vous désactiver l'utilisateur <strong class="text-gold">{{ u.username }}</strong> ({{ u.nomComplet }}) ?
@@ -144,6 +198,32 @@
 {% endif %}
 {% endfor %}
 
+{% for u in demandes %}
+<div id="modalDeleteUtilisateur{{ u.id }}" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 450px;">
+        <div class="modal-header">
+            <div class="modal-title text-red"><i class="fa-solid fa-user-xmark"></i> Refuser la demande</div>
+            <button onclick="closeModal('modalDeleteUtilisateur{{ u.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="post" action="{{ path('app_utilisateur_supprimer', {id: u.id}) }}">
+            {{ include('_csrf.html.twig') }}
+            <div class="modal-body">
+                <p style="font-size: 14px; line-height: 1.6; color: var(--text-main);">
+                    Refuser la demande d'accès de <strong class="text-gold">{{ u.nomComplet }}</strong> ({{ u.username }}) ?
+                </p>
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
+                    La demande sera supprimée. Le refus reste tracé dans le journal d'audit.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('modalDeleteUtilisateur{{ u.id }}')" class="btn btn-outline">Annuler</button>
+                <button type="submit" class="btn btn-danger"><i class="fa-solid fa-user-xmark"></i> Refuser</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endfor %}
+
 <!-- Modal Add Utilisateur -->
 <div id="modalAddUtilisateur" class="modal-backdrop">
     <div class="modal-content">
@@ -152,6 +232,7 @@
             <button onclick="closeModal('modalAddUtilisateur')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <form method="post" action="{{ path('app_utilisateur_nouveau') }}">
+            {{ include('_csrf.html.twig') }}
             <div class="modal-body">
                 <div class="form-row">
                     <div class="form-group">
@@ -170,7 +251,7 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">Mot de Passe *</label>
-                        <input type="password" name="password" class="form-control" placeholder="••••••••" required>
+                        <input type="password" name="password" class="form-control" placeholder="8 caractères minimum" minlength="8" autocomplete="new-password" required>
                     </div>
                 </div>
                 <div class="form-row">
@@ -185,8 +266,9 @@
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label class="form-label">Rôle Principal</label>
-                        <select name="role_id" class="form-select">
+                        <label class="form-label">Rôle Principal *</label>
+                        <select name="role_id" class="form-select" required>
+                            <option value="">-- Choisir un rôle --</option>
                             {% for r in rolesList %}
                                 <option value="{{ r.id }}">{{ r.libelle }} ({{ r.code }})</option>
                             {% endfor %}

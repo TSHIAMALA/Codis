@@ -19,14 +19,39 @@
     <div class="card-table-header">
         <div class="card-table-title"><i class="fa-solid fa-file-invoice"></i> Informations Générales</div>
         <div style="display: flex; gap: 10px; align-items: center;">
-            {% if commande.statut in ['SOUMISE', 'BROUILLON'] %}
-            <form method="post" action="{{ path('app_commande_valider', {id: commande.id}) }}" style="display:inline;">
-                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check-double"></i> Valider la commande et générer BL</button>
-            </form>
+            {% if workflow_can(commande, 'valider') and is_granted('ROLE_DELEGUE') %}
+                {% if credit and not credit.autorise %}
+                    <span title="Encours {{ credit.encours|number_format(2, ',', ' ') }} $ + commande {{ commande.montantTotal|number_format(2, ',', ' ') }} $ > limite {{ credit.limite|number_format(2, ',', ' ') }} $">
+                        <button type="button" class="btn btn-outline" disabled style="opacity: 0.6; cursor: not-allowed; color: #ef4444;"><i class="fa-solid fa-credit-card"></i> Limite de crédit dépassée</button>
+                    </span>
+                {% else %}
+                    <form method="post" action="{{ path('app_commande_valider', {id: commande.id}) }}" style="display:inline;">
+                        {{ include('_csrf.html.twig') }}
+                        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check-double"></i> Valider la commande et générer BL</button>
+                    </form>
+                {% endif %}
+            {% endif %}
+            {% if commande.statut == 'VALIDEE' and not livraisonActive and is_granted('ROLE_DELEGUE') %}
+                <form method="post" action="{{ path('app_commande_nouveau_bl', {id: commande.id}) }}" style="display:inline;">
+                    {{ include('_csrf.html.twig') }}
+                    <button type="submit" class="btn btn-primary" title="Le BL précédent a été annulé"><i class="fa-solid fa-file-circle-plus"></i> Générer un nouveau BL</button>
+                </form>
             {% endif %}
             <a href="{{ path('app_commande_index') }}" class="btn btn-outline btn-sm"><i class="fa-solid fa-arrow-left"></i> Retour aux commandes</a>
         </div>
     </div>
+
+    {% if credit %}
+    <div class="alert alert-{{ credit.autorise ? 'info' : 'danger' }}" style="margin: 0 20px 16px;">
+        <i class="fa-solid fa-credit-card"></i>
+        <span class="alert-text">
+            Crédit client — limite : <strong>{{ credit.limite > 0 ? credit.limite|number_format(2, ',', ' ') ~ ' $' : 'non plafonnée' }}</strong>
+            · encours : <strong>{{ credit.encours|number_format(2, ',', ' ') }} $</strong>
+            {% if credit.limite > 0 %}· disponible : <strong>{{ credit.disponible|number_format(2, ',', ' ') }} $</strong>{% endif %}
+            {% if not credit.autorise %}— la validation est bloquée : encaissez un règlement ou ajustez la limite du grossiste.{% endif %}
+        </span>
+    </div>
+    {% endif %}
 
     <div class="detail-grid">
         <div class="detail-item">
@@ -167,11 +192,12 @@
                     {% endif %}
                 </td>
                 <td style="text-align: right;">
-                    {% if l.statut == 'PREPARATION' %}
+                    {% if workflow_can(l, 'expedier') and is_granted('ROLE_GESTIONNAIRE_DEPOT') %}
                         {% if isDistAgree and not estPaye %}
-                            <a href="{{ path('app_paiement_index') }}" class="btn btn-warning btn-sm" title="Paiement requis avant expédition"><i class="fa-solid fa-lock"></i> Paiement Caisse Requis</a>
+                            <a href="{{ is_granted('ROLE_CAISSIER') ? path('app_paiement_index') : '#' }}" class="btn btn-warning btn-sm" title="Paiement requis avant expédition"><i class="fa-solid fa-lock"></i> Paiement Caisse Requis</a>
                         {% else %}
                             <form method="post" action="{{ path('app_livraison_expedier', {id: l.id}) }}" style="display:inline;">
+                                {{ include('_csrf.html.twig') }}
                                 <button type="submit" class="btn btn-primary btn-sm"><i class="fa-solid fa-paper-plane"></i> Expédier</button>
                             </form>
                         {% endif %}

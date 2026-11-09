@@ -1,0 +1,55 @@
+# Cycles de vie métier : toute transition non déclarée ici est refusée.
+# Les statuts sont stockés dans la propriété "statut" des entités (getStatut / setStatut).
+# Visualiser : php bin/console workflow:dump commande | dot -Tpng -o commande.png
+framework:
+    workflows:
+        commande:
+            type: state_machine
+            audit_trail: { enabled: true }
+            marking_store: { type: method, property: statut }
+            supports: [App\Entity\Commande]
+            initial_marking: SOUMISE
+            places: [BROUILLON, SOUMISE, VALIDEE, EXPEDIEE, RECEPTIONNEE, ANNULEE, REJETEE, EN_PREPARATION, LIVREE]
+            transitions:
+                valider: { from: [BROUILLON, SOUMISE], to: VALIDEE }
+                expedier: { from: [VALIDEE, EN_PREPARATION], to: EXPEDIEE }
+                receptionner: { from: [EXPEDIEE, LIVREE], to: RECEPTIONNEE }
+                # Annulation d'un BL en transit : la commande redevient livrable
+                retour_validee: { from: EXPEDIEE, to: VALIDEE }
+                annuler: { from: [BROUILLON, SOUMISE, VALIDEE, EN_PREPARATION], to: ANNULEE }
+
+        livraison:
+            type: state_machine
+            audit_trail: { enabled: true }
+            marking_store: { type: method, property: statut }
+            supports: [App\Entity\Livraison]
+            initial_marking: PREPARATION
+            places: [PLANIFIEE, PREPARATION, EXPEDIEE, EN_TRANSIT, LIVREE, RECEPTION_CONFIRMEE, INCIDENT, ANNULEE]
+            transitions:
+                expedier: { from: [PLANIFIEE, PREPARATION], to: EN_TRANSIT }
+                confirmer: { from: [EN_TRANSIT, EXPEDIEE, LIVREE], to: RECEPTION_CONFIRMEE }
+                annuler: { from: [PLANIFIEE, PREPARATION, EN_TRANSIT, EXPEDIEE, INCIDENT], to: ANNULEE }
+
+        consignation:
+            type: state_machine
+            audit_trail: { enabled: true }
+            marking_store: { type: method, property: statut }
+            supports: [App\Entity\DemandeConsignation]
+            initial_marking: SOUMISE
+            places: [SOUMISE, VALIDEE_SUPERVISEUR, VALIDEE_ASM, CLOTUREE, REJETEE]
+            transitions:
+                valider_superviseur: { from: SOUMISE, to: VALIDEE_SUPERVISEUR }
+                valider_asm: { from: VALIDEE_SUPERVISEUR, to: VALIDEE_ASM }
+                cloturer: { from: VALIDEE_ASM, to: CLOTUREE }
+                rejeter: { from: [SOUMISE, VALIDEE_SUPERVISEUR], to: REJETEE }
+
+        production:
+            type: state_machine
+            audit_trail: { enabled: true }
+            marking_store: { type: method, property: statut }
+            supports: [App\Entity\Production]
+            initial_marking: BROUILLON
+            places: [BROUILLON, VALIDEE, ANNULEE]
+            transitions:
+                valider: { from: BROUILLON, to: VALIDEE }
+                annuler: { from: BROUILLON, to: ANNULEE }

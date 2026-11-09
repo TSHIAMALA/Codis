@@ -10,7 +10,7 @@ class AuditLog
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
-    #[ORM\Column(type: 'bigint')]
+    #[ORM\Column(type: 'bigint', options: ['unsigned' => true])]
     private ?int $id = null;
 
     #[ORM\ManyToOne(targetEntity: Utilisateur::class)]
@@ -23,7 +23,7 @@ class AuditLog
     #[ORM\Column(type: 'string', length: 50)]
     private ?string $action = null; // INSERT, UPDATE, DELETE, LOGIN, VALIDATE
 
-    #[ORM\Column(type: 'bigint', nullable: true)]
+    #[ORM\Column(type: 'bigint', nullable: true, options: ['unsigned' => true])]
     private ?int $referenceId = null;
 
     #[ORM\Column(type: 'json', nullable: true)]

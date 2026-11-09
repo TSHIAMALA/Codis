@@ -8,11 +8,12 @@ use Doctrine\Common\Collections\Collection;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'livraison')]
+#[ORM\Index(name: 'idx_livraison_statut', columns: ['statut'])]
 class Livraison
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
-    #[ORM\Column(type: 'bigint')]
+    #[ORM\Column(type: 'bigint', options: ['unsigned' => true])]
     private ?int $id = null;
 
     #[ORM\Column(type: 'string', length: 50, unique: true)]

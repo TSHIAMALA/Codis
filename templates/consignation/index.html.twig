@@ -8,10 +8,24 @@
     <div class="card-table-header">
         <div class="card-table-title"><i class="fa-solid fa-clipboard-check text-gold"></i> Consignations & Tournées DR</div>
         <div style="display: flex; gap: 10px; align-items: center;">
-            <span class="badge badge-gold">{{ consignations|length }} demandes</span>
-            <button onclick="openModal('modalAddConsignation')" class="btn btn-gold btn-sm"><i class="fa-solid fa-plus"></i> Nouvelle Demande Prélèvement</button>
+            <span class="badge badge-gold">{{ consignations.total }} demandes</span>
+            {% if is_granted('ROLE_AGENT_COMMERCIAL') %}
+                <button onclick="openModal('modalAddConsignation')" class="btn btn-gold btn-sm"><i class="fa-solid fa-plus"></i> Nouvelle Demande Prélèvement</button>
+            {% endif %}
         </div>
     </div>
+
+    <form method="get" class="filtres">
+        <select name="statut" class="form-select" onchange="this.form.submit()" aria-label="Filtrer par statut">
+            <option value="">Tous les statuts</option>
+            {% for code, libelle in {SOUMISE: 'Soumise', VALIDEE_SUPERVISEUR: 'Validée Superviseur', VALIDEE_ASM: 'En tournée', CLOTUREE: 'Clôturée', REJETEE: 'Rejetée'} %}
+                <option value="{{ code }}" {% if app.request.query.get('statut') == code %}selected{% endif %}>{{ libelle }}</option>
+            {% endfor %}
+        </select>
+        {% if app.request.query.get('statut') %}
+            <a href="{{ path('app_consignation_index') }}" class="filtres-reset"><i class="fa-solid fa-xmark"></i> Réinitialiser</a>
+        {% endif %}
+    </form>
 
     <table class="custom-table">
         <thead>
@@ -36,12 +50,12 @@
                 <td>
                     <div style="display: flex; flex-direction: column; gap: 4px; font-size: 11px;">
                         {% if c.dateValidationSuperviseur %}
-                            <span class="badge badge-success" style="padding: 2px 8px;"><i class="fa-solid fa-check"></i> Superviseur OK</span>
+                            <span class="badge badge-success" style="padding: 2px 8px;" title="{{ c.dateValidationSuperviseur|date('d/m/Y H:i') }}"><i class="fa-solid fa-check"></i> Superviseur OK{% if c.superviseur and c.superviseur.utilisateur %} · {{ c.superviseur.utilisateur.nomComplet }}{% endif %}</span>
                         {% else %}
                             <span class="badge badge-warning" style="padding: 2px 8px;">Superviseur en attente</span>
                         {% endif %}
                         {% if c.dateValidationAsm %}
-                            <span class="badge badge-success" style="padding: 2px 8px;"><i class="fa-solid fa-check-double"></i> ASM OK</span>
+                            <span class="badge badge-success" style="padding: 2px 8px;" title="{{ c.dateValidationAsm|date('d/m/Y H:i') }}"><i class="fa-solid fa-check-double"></i> ASM OK{% if c.asm and c.asm.utilisateur %} · {{ c.asm.utilisateur.nomComplet }}{% endif %}</span>
                         {% else %}
                             <span class="badge badge-warning" style="padding: 2px 8px;">ASM en attente</span>
                         {% endif %}
@@ -55,25 +69,47 @@
                         <span class="badge badge-info"><i class="fa-solid fa-truck-ramp-box"></i> En tournée (Consignation)</span>
                     {% elseif c.statut == 'VALIDEE_SUPERVISEUR' %}
                         <span class="badge badge-warning">Validé Superviseur</span>
+                    {% elseif c.statut == 'REJETEE' %}
+                        <span class="badge badge-danger" title="{{ c.observation }}"><i class="fa-solid fa-ban"></i> Rejetée</span>
                     {% else %}
                         <span class="badge badge-primary">Soumise</span>
                     {% endif %}
                 </td>
                 <td style="text-align: right; white-space: nowrap;">
-                    {% if c.statut == 'SOUMISE' %}
+                    {% set peutN1 = is_granted('CONSIGNATION_VALIDER_SUPERVISEUR', c) %}
+                    {% set peutN2 = is_granted('CONSIGNATION_VALIDER_ASM', c) %}
+                    {% set peutCloturer = is_granted('CONSIGNATION_CLOTURER', c) %}
+
+                    {% if peutN1 %}
                         <form method="post" action="{{ path('app_consignation_valider_superviseur', {id: c.id}) }}" style="display:inline;">
+                            {{ include('_csrf.html.twig') }}
                             <button type="submit" class="btn btn-warning btn-sm" title="Valider Niveau 1 (Superviseur)"><i class="fa-solid fa-user-check"></i> Valider Superviseur</button>
                         </form>
                     {% endif %}
 
-                    {% if c.statut in ['SOUMISE', 'VALIDEE_SUPERVISEUR'] %}
-                        <form method="post" action="{{ path('app_consignation_valider_asm', {id: c.id}) }}" style="display:inline;">
+                    {% if peutN2 %}
+                        <form method="post" action="{{ path('app_consignation_valider_asm', {id: c.id}) }}" style="display:inline;" onsubmit="return confirm('Valider la demande {{ c.numero }} ? Le stock sera sorti du dépôt et confié au DR.');">
+                            {{ include('_csrf.html.twig') }}
                             <button type="submit" class="btn btn-primary btn-sm" title="Valider Niveau 2 (ASM) & Sortir Stock"><i class="fa-solid fa-check-double"></i> Valider ASM</button>
                         </form>
                     {% endif %}
 
-                    {% if c.statut == 'VALIDEE_ASM' %}
+                    {% if is_granted('CONSIGNATION_REJETER', c) %}
+                        <button onclick="openModal('modalRejeterConsignation{{ c.id }}')" class="btn btn-danger btn-sm" title="Rejeter la demande"><i class="fa-solid fa-ban"></i></button>
+                    {% endif %}
+
+                    {% if peutCloturer %}
                         <button onclick="openModal('modalCloturerConsignation{{ c.id }}')" class="btn btn-gold btn-sm" title="Clôturer la journée"><i class="fa-solid fa-file-invoice-dollar"></i> Clôture Journée</button>
+                    {% endif %}
+
+                    {% if not peutN1 and not peutN2 and not peutCloturer and c.statut not in ['CLOTUREE', 'REJETEE'] %}
+                        <span style="font-size: 12px; color: var(--text-muted);">
+                            <i class="fa-solid fa-hourglass-half"></i>
+                            {% if c.statut == 'SOUMISE' %}En attente du Superviseur
+                            {% elseif c.statut == 'VALIDEE_SUPERVISEUR' %}En attente de l'ASM
+                            {% elseif c.statut == 'VALIDEE_ASM' %}En tournée
+                            {% else %}{{ c.statut }}{% endif %}
+                        </span>
                     {% endif %}
                 </td>
             </tr>
@@ -82,6 +118,7 @@
             {% endfor %}
         </tbody>
     </table>
+    {{ include('_pagination.html.twig', {page: consignations}) }}
 </div>
 
 <!-- Modal Add Demande Consignation -->
@@ -92,20 +129,22 @@
             <button onclick="closeModal('modalAddConsignation')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <form method="post" action="{{ path('app_consignation_nouveau') }}">
+            {{ include('_csrf.html.twig') }}
             <div class="modal-body">
                 <div class="form-group">
                     <label class="form-label">Délégué Commercial (DR) *</label>
-                    <select name="dr_id" class="form-select" required>
+                    {% set drImpose = agentConnecte and agentConnecte.typeAgent == 'DR' and not is_granted('ROLE_DELEGUE') %}
+                    <select name="dr_id" class="form-select" required {% if drImpose %}style="pointer-events: none; opacity: 0.8;" tabindex="-1"{% endif %}>
                         <option value="">-- Sélectionner le DR --</option>
                         {% for a in agents %}
-                            <option value="{{ a.id }}">{{ a.utilisateur ? a.utilisateur.nomComplet ~ ' (' ~ a.typeAgentLibelle ~ ')' : 'Agent #' ~ a.id }}</option>
+                            <option value="{{ a.id }}" {% if agentConnecte and agentConnecte.id == a.id %}selected{% endif %}>{{ a.utilisateur ? a.utilisateur.nomComplet ~ ' (' ~ a.typeAgentLibelle ~ ')' : 'Agent #' ~ a.id }}</option>
                         {% endfor %}
                     </select>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label">Dépôt Source de Prélèvement *</label>
-                        <select name="depot_id" class="form-select" required>
+                        <select name="depot_id" id="consDepot" class="form-select" required onchange="majDispoConsignation()">
                             <option value="">-- Sélectionner le dépôt --</option>
                             {% for d in depots %}
                                 <option value="{{ d.id }}">{{ d.nom }}</option>
@@ -114,7 +153,7 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">Produit *</label>
-                        <select name="produit_id" class="form-select" required>
+                        <select name="produit_id" id="consProduit" class="form-select" required onchange="filtrerCondConsignation()">
                             <option value="">-- Sélectionner le produit --</option>
                             {% for p in produits %}
                                 <option value="{{ p.id }}">{{ p.nom }} (Code: {{ p.code }})</option>
@@ -122,9 +161,21 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Quantité Demandée pour la tournée *</label>
-                    <input type="number" step="0.001" name="quantite" class="form-control" placeholder="ex: 200" required>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Conditionnement *</label>
+                        <select name="conditionnement_id" id="consCond" class="form-select" required onchange="majDispoConsignation()">
+                            <option value="">-- Choisir le produit d'abord --</option>
+                            {% for cd in conditionnements %}
+                                <option value="{{ cd.id }}" data-produit="{{ cd.produit ? cd.produit.id : '' }}" hidden>{{ cd.libelle }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Quantité Demandée pour la tournée *</label>
+                        <input type="number" step="0.001" min="0.001" name="quantite" id="consQte" class="form-control" placeholder="ex: 200" required oninput="majDispoConsignation()">
+                        <div id="consDispo" style="font-size: 11px; margin-top: 4px; color: var(--text-muted);"></div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Observations / Objectifs Tournée</label>
@@ -142,36 +193,49 @@
 <!-- Modals Clôture Journée DR (Rendered Outside Table) -->
 {% for c in consignations %}
 {% if c.statut == 'VALIDEE_ASM' %}
-<div id="modalCloturerConsignation{{ c.id }}" class="modal-backdrop">
+<div id="modalCloturerConsignation{{ c.id }}" class="modal-backdrop modal-cloture" data-id="{{ c.id }}">
     <div class="modal-content">
         <div class="modal-header">
             <div class="modal-title"><i class="fa-solid fa-calculator text-gold"></i> Clôture & Justification de Journée — {{ c.numero }}</div>
             <button onclick="closeModal('modalCloturerConsignation{{ c.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <form method="post" action="{{ path('app_consignation_cloturer', {id: c.id}) }}">
+            {{ include('_csrf.html.twig') }}
             <div class="modal-body">
                 <div class="form-group">
                     <label class="form-label">DR</label>
                     <input type="text" class="form-control" value="{{ c.dr and c.dr.utilisateur ? c.dr.utilisateur.nomComplet : '' }}" disabled>
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Cash Total Encaissé à la Caisse ($) *</label>
-                    <input type="number" step="0.01" name="cashJustifie" class="form-control" placeholder="ex: 1500.00" required>
-                </div>
-                
-                <div style="margin-top: 16px; font-weight: 700; font-size: 13px; color: var(--text-gold); margin-bottom: 8px;">Détail des Invendus & Ventes :</div>
+                <div style="margin-top: 8px; font-weight: 700; font-size: 13px; color: var(--text-gold); margin-bottom: 8px;">Détail des Ventes & Invendus :</div>
                 {% for l in c.lignes %}
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label">Quantité Vendue ({{ l.produit ? l.produit.nom : '' }})</label>
-                        <input type="number" step="0.001" name="quantiteVendue_{{ l.id }}" class="form-control" value="{{ l.quantiteAccordee }}">
+                {% set prix = prixAttendus[l.id] ?? null %}
+                <div class="ligne-cloture" data-confiee="{{ l.quantiteAccordee }}" data-prix="{{ prix ?? '' }}" style="padding: 10px 12px; margin-bottom: 10px; background: var(--bg-card-subtle); border: 1px solid var(--border-subtle); border-radius: 10px;">
+                    <div style="font-size: 12px; font-weight: 700; margin-bottom: 6px;">
+                        {{ l.produit ? l.produit.nom : '' }}{% if l.conditionnement %} — {{ l.conditionnement.libelle }}{% endif %}
+                        <span style="font-weight: 400; color: var(--text-muted);">· confié : {{ l.quantiteAccordee|number_format(0, ',', ' ') }}{% if prix %} · {{ prix|number_format(2, ',', ' ') }} $ / u.{% endif %}</span>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Invendus à réintégrer au stock</label>
-                        <input type="number" step="0.001" name="quantiteRetournee_{{ l.id }}" class="form-control" value="0.000">
+                    <div class="form-row">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">Quantité vendue</label>
+                            <input type="number" step="0.001" min="0" name="quantiteVendue_{{ l.id }}" class="form-control input-vendue" value="{{ l.quantiteAccordee }}" oninput="majCloture({{ c.id }}, this, 'vendue')">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">Invendus à réintégrer au dépôt</label>
+                            <input type="number" step="0.001" min="0" name="quantiteRetournee_{{ l.id }}" class="form-control input-retour" value="0" oninput="majCloture({{ c.id }}, this, 'retour')">
+                        </div>
                     </div>
                 </div>
                 {% endfor %}
+
+                <div class="form-group" style="margin-top: 12px;">
+                    <label class="form-label">Cash Total Encaissé à la Caisse ($) *</label>
+                    <input type="number" step="0.01" min="0" name="cashJustifie" class="form-control input-cash" placeholder="ex: 1500.00" required oninput="majCloture({{ c.id }})">
+                </div>
+                <div class="resume-cloture" style="font-size: 12px; padding: 10px 12px; border-radius: 8px; background: rgba(212, 160, 23, 0.08); border: 1px solid rgba(212, 160, 23, 0.2);"></div>
+                <div class="form-group bloc-justification" style="margin-top: 12px; display: none;">
+                    <label class="form-label">Justification de l'écart de caisse *</label>
+                    <textarea name="justificationEcart" class="form-control" rows="2" placeholder="ex: remise accordée au grossiste X, 2 cartons offerts en dégustation..."></textarea>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" onclick="closeModal('modalCloturerConsignation{{ c.id }}')" class="btn btn-outline">Annuler</button>
@@ -181,5 +245,99 @@
     </div>
 </div>
 {% endif %}
+{% if is_granted('CONSIGNATION_REJETER', c) %}
+<div id="modalRejeterConsignation{{ c.id }}" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 460px;">
+        <div class="modal-header">
+            <div class="modal-title text-red"><i class="fa-solid fa-ban"></i> Rejeter la demande {{ c.numero }}</div>
+            <button onclick="closeModal('modalRejeterConsignation{{ c.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="post" action="{{ path('app_consignation_rejeter', {id: c.id}) }}">
+            {{ include('_csrf.html.twig') }}
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Motif du rejet *</label>
+                    <textarea name="motif" class="form-control" rows="3" required placeholder="ex: quantité trop élevée pour le secteur, stock réservé..."></textarea>
+                </div>
+                <p style="font-size: 12px; color: var(--text-muted);">Aucun mouvement de stock n'a encore eu lieu pour cette demande.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('modalRejeterConsignation{{ c.id }}')" class="btn btn-outline">Annuler</button>
+                <button type="submit" class="btn btn-danger"><i class="fa-solid fa-ban"></i> Rejeter</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
 {% endfor %}
+
+<script>
+var stocksDepots = {{ stocksDepots|json_encode|raw }};
+
+function fmt(n) { return n.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
+
+function filtrerCondConsignation() {
+    var produit = document.getElementById('consProduit').value;
+    var select = document.getElementById('consCond');
+    var visibles = [];
+    select.querySelectorAll('option[data-produit]').forEach(function(o) {
+        o.hidden = o.dataset.produit !== produit;
+        if (!o.hidden) visibles.push(o);
+    });
+    select.options[0].textContent = produit ? '-- Unité --' : "-- Choisir le produit d'abord --";
+    select.value = visibles.length === 1 ? visibles[0].value : '';
+    majDispoConsignation();
+}
+
+// Indique le stock disponible au dépôt (le contrôle définitif a lieu à la validation ASM)
+function majDispoConsignation() {
+    var depot = document.getElementById('consDepot').value;
+    var cond = document.getElementById('consCond').value;
+    var qte = parseFloat(document.getElementById('consQte').value) || 0;
+    var info = document.getElementById('consDispo');
+    if (!depot || !cond) { info.textContent = ''; return; }
+    var dispo = (stocksDepots[depot] && stocksDepots[depot][cond]) || 0;
+    info.style.color = qte > dispo ? '#ef4444' : 'var(--text-muted)';
+    info.innerHTML = '<i class="fa-solid fa-warehouse"></i> Disponible au dépôt : <strong>' + dispo.toLocaleString('fr-FR') + '</strong>'
+        + (qte > dispo ? ' — quantité supérieure au stock, la validation ASM sera refusée' : '');
+}
+
+// Clôture : vendu + invendus = confié, et contrôle du cash attendu
+function majCloture(id, champ, sens) {
+    var modal = document.getElementById('modalCloturerConsignation' + id);
+    if (champ) {
+        var ligne = champ.closest('.ligne-cloture');
+        var confiee = parseFloat(ligne.dataset.confiee) || 0;
+        var v = Math.min(Math.max(parseFloat(champ.value) || 0, 0), confiee);
+        var autre = ligne.querySelector(sens === 'vendue' ? '.input-retour' : '.input-vendue');
+        autre.value = +(confiee - v).toFixed(3);
+    }
+    var attendu = 0, prixConnus = true;
+    modal.querySelectorAll('.ligne-cloture').forEach(function(l) {
+        if (l.dataset.prix === '') { prixConnus = false; return; }
+        attendu += (parseFloat(l.querySelector('.input-vendue').value) || 0) * parseFloat(l.dataset.prix);
+    });
+    var cashInput = modal.querySelector('.input-cash');
+    var resume = modal.querySelector('.resume-cloture');
+    var bloc = modal.querySelector('.bloc-justification');
+    if (!prixConnus) {
+        resume.innerHTML = '<i class="fa-solid fa-circle-info"></i> Tarif non défini pour un produit : le cash attendu ne peut pas être calculé.';
+        bloc.style.display = 'none';
+        return;
+    }
+    var html = '<i class="fa-solid fa-calculator"></i> Valeur des ventes attendue : <strong>' + fmt(attendu) + ' $</strong>';
+    var ecart = cashInput.value === '' ? 0 : Math.round(((parseFloat(cashInput.value) || 0) - attendu) * 100) / 100;
+    if (cashInput.value !== '' && Math.abs(ecart) >= 0.01) {
+        html += ' · <span style="color: #ef4444; font-weight: 700;">Écart : ' + (ecart > 0 ? '+' : '') + fmt(ecart) + ' $</span>';
+    } else if (cashInput.value !== '') {
+        html += ' · <span style="color: #10b981; font-weight: 700;"><i class="fa-solid fa-check"></i> Caisse équilibrée</span>';
+    }
+    resume.innerHTML = html;
+    var besoin = cashInput.value !== '' && Math.abs(ecart) >= 0.01;
+    bloc.style.display = besoin ? 'block' : 'none';
+    bloc.querySelector('textarea').required = besoin;
+}
+
+document.querySelectorAll('.modal-cloture').forEach(function(m) { majCloture(m.dataset.id); });
+</script>
 {% endblock %}

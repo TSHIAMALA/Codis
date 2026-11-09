@@ -6,11 +6,14 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'mouvement_stock')]
+#[ORM\Index(name: 'idx_mvt_date', columns: ['date_mouvement'])]
+#[ORM\Index(name: 'idx_mvt_type', columns: ['type_mouvement'])]
+#[ORM\Index(name: 'idx_mvt_reference', columns: ['reference_type', 'reference_id'])]
 class MouvementStock
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
-    #[ORM\Column(type: 'bigint')]
+    #[ORM\Column(type: 'bigint', options: ['unsigned' => true])]
     private ?int $id = null;
 
     #[ORM\Column(type: 'datetime', options: ['default' => 'CURRENT_TIMESTAMP'])]
@@ -45,7 +48,7 @@ class MouvementStock
     #[ORM\Column(type: 'string', length: 100, nullable: true)]
     private ?string $referenceType = null;
 
-    #[ORM\Column(type: 'bigint', nullable: true)]
+    #[ORM\Column(type: 'bigint', nullable: true, options: ['unsigned' => true])]
     private ?int $referenceId = null;
 
     #[ORM\ManyToOne(targetEntity: Utilisateur::class)]

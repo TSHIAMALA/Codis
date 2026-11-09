@@ -10,7 +10,7 @@ class Tarif
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
-    #[ORM\Column(type: 'bigint')]
+    #[ORM\Column(type: 'bigint', options: ['unsigned' => true])]
     private ?int $id = null;
 
     #[ORM\ManyToOne(targetEntity: Pays::class)]
@@ -39,7 +39,7 @@ class Tarif
     #[ORM\Column(type: 'decimal', precision: 15, scale: 2)]
     private ?string $prix = '0.00';
 
-    #[ORM\Column(type: 'date', options: ['default' => 'CURRENT_TIMESTAMP'])]
+    #[ORM\Column(type: 'date')] // initialisée dans le constructeur
     private ?\DateTimeInterface $dateDebut = null;
 
     #[ORM\Column(type: 'date', nullable: true)]

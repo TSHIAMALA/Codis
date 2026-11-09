@@ -1,0 +1,30 @@
+{# Barre de pagination. Usage : {{ include('_pagination.html.twig', {page: commandes}) }}
+   Les autres paramètres de l'URL (filtres, onglet) sont conservés. #}
+{% if page.total > 0 %}
+    {% set route = app.request.attributes.get('_route') %}
+    {% set params = app.request.attributes.get('_route_params')|merge(app.request.query.all) %}
+    <nav class="pagination" aria-label="Pagination">
+        <span class="pagination-info">
+            {{ page.premier }}–{{ page.dernier }} sur <strong>{{ page.total }}</strong>
+        </span>
+        {% if page.pages > 1 %}
+            <div class="pagination-liens">
+                {% if page.numero > 1 %}
+                    <a href="{{ path(route, params|merge({page: page.numero - 1})) }}" class="pagination-lien" aria-label="Page précédente"><i class="fa-solid fa-chevron-left"></i></a>
+                {% endif %}
+                {% for p in page.fenetre %}
+                    {% if p is null %}
+                        <span class="pagination-ellipse">…</span>
+                    {% elseif p == page.numero %}
+                        <span class="pagination-lien actif" aria-current="page">{{ p }}</span>
+                    {% else %}
+                        <a href="{{ path(route, params|merge({page: p})) }}" class="pagination-lien">{{ p }}</a>
+                    {% endif %}
+                {% endfor %}
+                {% if page.numero < page.pages %}
+                    <a href="{{ path(route, params|merge({page: page.numero + 1})) }}" class="pagination-lien" aria-label="Page suivante"><i class="fa-solid fa-chevron-right"></i></a>
+                {% endif %}
+            </div>
+        {% endif %}
+    </nav>
+{% endif %}

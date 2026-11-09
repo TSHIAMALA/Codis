@@ -6,11 +6,12 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'delegue_grossiste')]
+#[ORM\UniqueConstraint(name: 'uk_delegue_grossiste', columns: ['delegue_id', 'grossiste_id'])]
 class DelegueGrossiste
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
-    #[ORM\Column(type: 'bigint')]
+    #[ORM\Column(type: 'bigint', options: ['unsigned' => true])]
     private ?int $id = null;
 
     #[ORM\ManyToOne(targetEntity: Delegue::class)]
@@ -21,7 +22,7 @@ class DelegueGrossiste
     #[ORM\JoinColumn(name: 'grossiste_id', referencedColumnName: 'id', nullable: false)]
     private ?Grossiste $grossiste = null;
 
-    #[ORM\Column(type: 'date', options: ['default' => 'CURRENT_TIMESTAMP'])]
+    #[ORM\Column(type: 'date')] // initialisée dans le constructeur
     private ?\DateTimeInterface $dateDebut = null;
 
     #[ORM\Column(type: 'date', nullable: true)]

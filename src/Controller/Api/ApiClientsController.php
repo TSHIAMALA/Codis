@@ -14,7 +14,8 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/api')]
 class ApiClientsController extends AbstractController
@@ -22,8 +23,16 @@ class ApiClientsController extends AbstractController
     #[Route('/clients/portefeuille', name: 'api_clients_portefeuille', methods: ['GET'])]
     public function getPortefeuille(Request $request, EntityManagerInterface $em): JsonResponse
     {
-        $agentId = $request->query->get('agent_id');
-        $agent = $agentId ? $em->getRepository(AgentCommercial::class)->find($agentId) : null;
+        // Un agent ne consulte que son propre portefeuille
+        if ($this->isGranted('ROLE_DELEGUE')) {
+            $agentId = $request->query->get('agent_id');
+            $agent = $agentId ? $em->getRepository(AgentCommercial::class)->find($agentId) : null;
+        } else {
+            $agent = $em->getRepository(AgentCommercial::class)->findOneBy(['utilisateur' => $this->getUser(), 'actif' => true]);
+            if (!$agent) {
+                return new JsonResponse([]);
+            }
+        }
 
         if ($agent) {
             $liens = $em->getRepository(PortefeuilleClient::class)->findBy(['agent' => $agent, 'actif' => true]);
@@ -52,6 +61,7 @@ class ApiClientsController extends AbstractController
         return new JsonResponse($res);
     }
 
+    #[IsGranted('ROLE_AGENT_COMMERCIAL')]
     #[Route('/clients/nouveau', name: 'api_clients_create', methods: ['POST'])]
     public function createClient(Request $request, EntityManagerInterface $em): JsonResponse
     {
@@ -81,15 +91,16 @@ class ApiClientsController extends AbstractController
 
         $em->persist($d);
 
-        // Attach to agent if provided
-        if (!empty($data['agent_id'])) {
+        // Rattachement au portefeuille de l'agent connecté (ou de l'agent choisi par un délégué)
+        $agent = $em->getRepository(AgentCommercial::class)->findOneBy(['utilisateur' => $this->getUser(), 'actif' => true]);
+        if ($this->isGranted('ROLE_DELEGUE') && !empty($data['agent_id'])) {
             $agent = $em->getRepository(AgentCommercial::class)->find($data['agent_id']);
-            if ($agent) {
-                $pf = new PortefeuilleClient();
-                $pf->setAgent($agent);
-                $pf->setDetailant($d);
-                $em->persist($pf);
-            }
+        }
+        if ($agent) {
+            $pf = new PortefeuilleClient();
+            $pf->setAgent($agent);
+            $pf->setDetailant($d);
+            $em->persist($pf);
         }
 
         $em->flush();

@@ -8,11 +8,12 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'demande_consignation')]
+#[ORM\Index(name: 'idx_consignation_statut', columns: ['statut'])]
 class DemandeConsignation
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
-    #[ORM\Column(type: 'bigint')]
+    #[ORM\Column(type: 'bigint', options: ['unsigned' => true])]
     private ?int $id = null;
 
     #[ORM\Column(type: 'string', length: 50, unique: true)]

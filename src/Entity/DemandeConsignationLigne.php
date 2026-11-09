@@ -10,7 +10,7 @@ class DemandeConsignationLigne
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
-    #[ORM\Column(type: 'bigint')]
+    #[ORM\Column(type: 'bigint', options: ['unsigned' => true])]
     private ?int $id = null;
 
     #[ORM\ManyToOne(targetEntity: DemandeConsignation::class, inversedBy: 'lignes')]
@@ -20,6 +20,10 @@ class DemandeConsignationLigne
     #[ORM\ManyToOne(targetEntity: Produit::class)]
     #[ORM\JoinColumn(name: 'produit_id', referencedColumnName: 'id', nullable: false)]
     private ?Produit $produit = null;
+
+    #[ORM\ManyToOne(targetEntity: Conditionnement::class)]
+    #[ORM\JoinColumn(name: 'conditionnement_id', referencedColumnName: 'id', nullable: true)]
+    private ?Conditionnement $conditionnement = null;
 
     #[ORM\Column(type: 'decimal', precision: 15, scale: 3)]
     private ?string $quantiteDemandee = '0.000';
@@ -38,6 +42,8 @@ class DemandeConsignationLigne
     public function setDemande(?DemandeConsignation $d): self { $this->demande = $d; return $this; }
     public function getProduit(): ?Produit { return $this->produit; }
     public function setProduit(?Produit $p): self { $this->produit = $p; return $this; }
+    public function getConditionnement(): ?Conditionnement { return $this->conditionnement; }
+    public function setConditionnement(?Conditionnement $c): self { $this->conditionnement = $c; return $this; }
     public function getQuantiteDemandee(): ?string { return $this->quantiteDemandee; }
     public function setQuantiteDemandee(string $q): self { $this->quantiteDemandee = $q; return $this; }
     public function getQuantiteAccordee(): ?string { return $this->quantiteAccordee; }

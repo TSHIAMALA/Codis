@@ -27,10 +27,10 @@
         <i class="fa-solid fa-boxes-packing"></i> Synthèse par Produit ({{ stocksParProduit|length }})
     </a>
     <a href="{{ path('app_stock_index', {tab: 'detail'}) }}" class="btn {% if activeTab == 'detail' %}btn-gold{% else %}btn-outline{% endif %} btn-sm">
-        <i class="fa-solid fa-layer-group"></i> Détail par Emplacement & Lot ({{ stocks|length }})
+        <i class="fa-solid fa-layer-group"></i> Détail par Emplacement & Lot ({{ stocks.total }})
     </a>
     <a href="{{ path('app_stock_index', {tab: 'mouvements'}) }}" class="btn {% if activeTab == 'mouvements' %}btn-gold{% else %}btn-outline{% endif %} btn-sm">
-        <i class="fa-solid fa-timeline"></i> Historique Mouvements ({{ mouvements|length }})
+        <i class="fa-solid fa-timeline"></i> Historique Mouvements ({{ mouvements.total }})
     </a>
 </div>
 
@@ -85,7 +85,7 @@
 <div class="card-table">
     <div class="card-table-header">
         <div class="card-table-title"><i class="fa-solid fa-layer-group text-gold"></i> Détail par Emplacement & Lot</div>
-        <span class="badge badge-gold">{{ stocks|length }} lots</span>
+        <span class="badge badge-gold">{{ stocks.total }} lignes</span>
     </div>
 
     <table class="custom-table">
@@ -116,6 +116,7 @@
             {% endfor %}
         </tbody>
     </table>
+    {{ include('_pagination.html.twig', {page: stocks}) }}
 </div>
 {% endif %}
 
@@ -124,7 +125,7 @@
 <div class="card-table">
     <div class="card-table-header">
         <div class="card-table-title"><i class="fa-solid fa-timeline text-gold"></i> Historique des Mouvements</div>
-        <span class="badge badge-gold">{{ mouvements|length }} mouvements</span>
+        <span class="badge badge-gold">{{ mouvements.total }} mouvements</span>
     </div>
 
     <table class="custom-table">
@@ -155,6 +156,7 @@
             {% endfor %}
         </tbody>
     </table>
+    {{ include('_pagination.html.twig', {page: mouvements}) }}
 </div>
 {% endif %}
 {% endblock %}

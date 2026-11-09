@@ -10,7 +10,7 @@
         <div class="card-table-title"><i class="fa-solid fa-boxes-packing text-gold"></i> Catalogue des Produits</div>
         <div style="display: flex; gap: 10px; align-items: center;">
             <span class="badge badge-gold">{{ produits|length }} références</span>
-            <button onclick="openModal('modalAddProduit')" class="btn btn-gold btn-sm"><i class="fa-solid fa-plus"></i> Nouveau Produit</button>
+            {% if is_granted('ROLE_ADMIN_PAYS') %}<button onclick="openModal('modalAddProduit')" class="btn btn-gold btn-sm"><i class="fa-solid fa-plus"></i> Nouveau Produit</button>{% endif %}
         </div>
     </div>
 
@@ -54,7 +54,7 @@
         <div class="card-table-title"><i class="fa-solid fa-tags text-gold"></i> Catégories de Produits</div>
         <div style="display: flex; gap: 10px; align-items: center;">
             <span class="badge badge-gold">{{ categories|length }} catégories</span>
-            <button onclick="openModal('modalAddCategorie')" class="btn btn-gold btn-sm"><i class="fa-solid fa-plus"></i> Nouvelle Catégorie</button>
+            {% if is_granted('ROLE_ADMIN_PAYS') %}<button onclick="openModal('modalAddCategorie')" class="btn btn-gold btn-sm"><i class="fa-solid fa-plus"></i> Nouvelle Catégorie</button>{% endif %}
         </div>
     </div>
 
@@ -94,6 +94,7 @@
             <button onclick="closeModal('modalAddProduit')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <form method="post" action="{{ path('app_produit_nouveau') }}">
+            {{ include('_csrf.html.twig') }}
             <div class="modal-body">
                 <div class="form-row">
                     <div class="form-group">
@@ -146,6 +147,7 @@
             <button onclick="closeModal('modalAddCategorie')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <form method="post" action="{{ path('app_categorie_nouveau') }}">
+            {{ include('_csrf.html.twig') }}
             <div class="modal-body">
                 <div class="form-group">
                     <label class="form-label">Libellé de la Catégorie *</label>

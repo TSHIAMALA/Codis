@@ -9,20 +9,34 @@ use App\Entity\Produit;
 use App\Entity\Lot;
 use App\Entity\Conditionnement;
 use App\Entity\EmplacementStock;
+use App\Exception\OperationImpossibleException;
+use App\Pagination\Page;
 use App\Service\StockManagerService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request as HttpRequest;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Symfony\Component\DependencyInjection\Attribute\Target;
+use Symfony\Component\Workflow\WorkflowInterface;
 
+#[IsGranted('ROLE_RESPONSABLE_USINE', message: 'La production est réservée aux responsables usine.')]
 #[Route('/production')]
 class ProductionController extends AbstractController
 {
     #[Route('', name: 'app_production_index')]
-    public function index(EntityManagerInterface $em): Response
+    public function index(HttpRequest $request, EntityManagerInterface $em): Response
     {
-        $productions = $em->getRepository(Production::class)->findBy([], ['dateProduction' => 'DESC']);
+        $productions = Page::depuisRequete($em->createQueryBuilder()
+            ->select('pr', 'u', 'l', 'p', 'lot')
+            ->from(Production::class, 'pr')
+            ->leftJoin('pr.usine', 'u')
+            ->leftJoin('pr.lignes', 'l')
+            ->leftJoin('l.produit', 'p')
+            ->leftJoin('l.lot', 'lot')
+            ->orderBy('pr.dateProduction', 'DESC')
+            ->addOrderBy('pr.id', 'DESC'), $request, jointureCollection: true);
         $usines = $em->getRepository(Usine::class)->findBy(['actif' => true]);
         $produits = $em->getRepository(Produit::class)->findBy(['actif' => true]);
         $lots = $em->getRepository(Lot::class)->findBy([], ['dateFabrication' => 'DESC'], 20);
@@ -93,24 +107,34 @@ class ProductionController extends AbstractController
     }
 
     #[Route('/{id}/valider', name: 'app_production_valider', methods: ['POST'])]
-    public function valider(Production $production, EntityManagerInterface $em, StockManagerService $stockService): Response
-    {
-        if ($production->getStatut() === 'BROUILLON') {
-            $production->setStatut('VALIDEE');
+    public function valider(
+        Production $production,
+        EntityManagerInterface $em,
+        StockManagerService $stockService,
+        #[Target('production')] WorkflowInterface $productionWorkflow
+    ): Response {
+        if (!$productionWorkflow->can($production, 'valider')) {
+            $this->addFlash('warning', 'L\'ordre de production ' . $production->getNumero() . ' a déjà été traité (statut : ' . $production->getStatut() . ').');
+            return $this->redirectToRoute('app_production_index');
+        }
 
-            // Find usine stock emplacement
-            $emp = $em->getRepository(EmplacementStock::class)->findOneBy([
-                'usine' => $production->getUsine(),
-                'typeEmplacement' => 'USINE'
-            ]);
+        $emp = $em->getRepository(EmplacementStock::class)->findOneBy([
+            'usine' => $production->getUsine(),
+            'typeEmplacement' => 'USINE',
+            'actif' => true,
+        ]);
+        if (!$emp) {
+            $this->addFlash('danger', 'Validation impossible : aucun emplacement de stock actif pour l\'usine ' . ($production->getUsine()?->getNom() ?? '') . '.');
+            return $this->redirectToRoute('app_production_index');
+        }
 
-            if ($emp) {
+        try {
+            $em->wrapInTransaction(function () use ($production, $emp, $stockService, $productionWorkflow) {
                 foreach ($production->getLignes() as $ligne) {
-                    $stockService->enregistrerMouvement(
+                    $stockService->entrer(
                         'PRODUCTION',
                         $ligne->getProduit(),
                         (float) $ligne->getQuantite(),
-                        null,
                         $emp,
                         $ligne->getLot(),
                         $ligne->getConditionnement(),
@@ -120,10 +144,11 @@ class ProductionController extends AbstractController
                         'Validation production ' . $production->getNumero()
                     );
                 }
-            }
-
-            $em->flush();
+                $productionWorkflow->apply($production, 'valider');
+            });
             $this->addFlash('success', 'Production ' . $production->getNumero() . ' validée et stock usine mis à jour !');
+        } catch (OperationImpossibleException $e) {
+            $this->addFlash('danger', 'Validation refusée : ' . $e->getMessage());
         }
 
         return $this->redirectToRoute('app_production_index');
@@ -147,12 +172,14 @@ class ProductionController extends AbstractController
     }
 
     #[Route('/{id}/annuler', name: 'app_production_annuler', methods: ['POST'])]
-    public function annuler(Production $production, EntityManagerInterface $em): Response
+    public function annuler(Production $production, EntityManagerInterface $em, #[Target('production')] WorkflowInterface $productionWorkflow): Response
     {
-        if ($production->getStatut() !== 'VALIDEE') {
-            $production->setStatut('ANNULEE');
+        if ($productionWorkflow->can($production, 'annuler')) {
+            $productionWorkflow->apply($production, 'annuler');
             $em->flush();
             $this->addFlash('warning', 'Ordre de production ' . $production->getNumero() . ' annulé (suppression logique).');
+        } else {
+            $this->addFlash('danger', 'Un ordre de production validé ne peut plus être annulé : son stock est déjà entré en usine.');
         }
         return $this->redirectToRoute('app_production_index');
     }

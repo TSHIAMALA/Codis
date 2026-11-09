@@ -17,8 +17,9 @@ class UtilisateurRepository extends ServiceEntityRepository implements UserLoade
 
     public function loadUserByIdentifier(string $identifier): ?UserInterface
     {
+        // Les comptes inactifs sont chargés pour que UserChecker affiche un message explicite.
         return $this->createQueryBuilder('u')
-            ->where('(u.username = :id OR u.email = :id) AND u.actif = true')
+            ->where('u.username = :id OR u.email = :id')
             ->setParameter('id', $identifier)
             ->getQuery()
             ->getOneOrNullResult();

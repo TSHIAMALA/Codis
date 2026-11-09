@@ -4,13 +4,30 @@ Ce document constitue le guide de prise en main et de test pas à pas de l'ensem
 
 ---
 
-## 🔑 1. Identifiants d'Accès Administration
+## 🔑 1. Accès & Rôles
 
-- **URL de l'application** : `http://localhost:803`
-- **Page de connexion** : `http://localhost:803/login`
-- **Identifiants Admin par défaut** :
-  - **Email / Login** : `admin@codis.com` *(ou username `admin`)*
-  - **Mot de Passe** : `adminpassword`
+- **URL de l'application** : `http://localhost/CODIS/codis_web/public/index.php`
+- **Page de connexion** : `.../login`. Toutes les pages (et toute l'API sauf `/api/login`) exigent une connexion.
+- **Compte administrateur** : `admin@codis.com`. Le mot de passe n'est jamais écrit dans la documentation ; demandez-le à l'administrateur.
+- **Nouveaux utilisateurs** : « Demander un accès » depuis la page de connexion. Le compte reste inactif jusqu'à ce qu'un administrateur l'accepte et lui attribue un rôle (*Administration ➔ Utilisateurs & Accès*).
+- **Secrets** (`APP_SECRET`, `JWT_PASSPHRASE`) : uniquement dans `.env.local` (non versionné).
+
+### Matrice des accès
+
+| Rôle | Modules accessibles |
+| :--- | :--- |
+| **Administrateur général** (`SUPER_ADMIN`) | Tout, y compris Audit et la gestion des autres administrateurs généraux |
+| **Administrateur pays** (`ADMIN_PAYS`) | Tout sauf Audit ; grille tarifaire, utilisateurs, validations N1/N2 des consignations |
+| **Délégué commercial** (`DELEGUE`) | Réseau commercial, commandes (validation, annulation), consignations |
+| **Agent commercial** (`AGENT_COMMERCIAL`) | Commandes (création), consignations (demande), catalogue, stocks (lecture) |
+| **Gestionnaire dépôt** (`GESTIONNAIRE_DEPOT`) | Livraisons, clôture des consignations, catalogue, stocks |
+| **Caissier** (`CAISSIER`) | Paiements & crédits, catalogue, stocks |
+| **Responsable usine** (`RESPONSABLE_USINE`) | Production, catalogue, stocks |
+| **Utilisateur grossiste** (`GROSSISTE_USER`) | Pas d'accès à l'interface web (application mobile uniquement) |
+
+**Consignations DR** : le niveau 1 est validé par le Superviseur du DR (ou un ASM), le niveau 2 par un ASM *différent* du valideur N1. Les fonctions ASM / Superviseur / DR sont définies sur la fiche Agent (*Réseau commercial ➔ Agents*).
+
+**Prix** : le prix de chaque ligne de commande est toujours calculé côté serveur à partir de la grille tarifaire (zone, puis région, puis national). Une commande dont un produit n'a pas de tarif actif est refusée.
 
 ---
 

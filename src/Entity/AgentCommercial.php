@@ -10,7 +10,7 @@ class AgentCommercial
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
-    #[ORM\Column(type: 'bigint')]
+    #[ORM\Column(type: 'bigint', options: ['unsigned' => true])]
     private ?int $id = null;
 
     #[ORM\OneToOne(targetEntity: Utilisateur::class)]

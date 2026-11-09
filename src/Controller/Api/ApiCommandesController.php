@@ -11,13 +11,14 @@ use App\Entity\Detailant;
 use App\Entity\AgentCommercial;
 use App\Entity\Delegue;
 use App\Entity\Depot;
-use App\Entity\Utilisateur;
 use App\Service\OrderManagerService;
+use App\Service\TarifResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/api')]
 class ApiCommandesController extends AbstractController
@@ -30,7 +31,15 @@ class ApiCommandesController extends AbstractController
         $grossisteId = $request->query->get('grossiste_id');
 
         $criteria = [];
-        if ($agentId) {
+        // Un agent ne voit que ses propres commandes ; les filtres libres sont réservés aux délégués
+        if (!$this->isGranted('ROLE_DELEGUE')) {
+            $agent = $this->getAgentConnecte($em);
+            if (!$agent) {
+                return new JsonResponse([]);
+            }
+            $criteria['agent'] = $agent;
+            $delegueId = $grossisteId = null;
+        } elseif ($agentId) {
             $agent = $em->getRepository(AgentCommercial::class)->find($agentId);
             if ($agent) $criteria['agent'] = $agent;
         }
@@ -75,14 +84,21 @@ class ApiCommandesController extends AbstractController
         return new JsonResponse($res);
     }
 
+    #[IsGranted('ROLE_AGENT_COMMERCIAL', message: 'Création de commande réservée aux agents commerciaux.')]
     #[Route('/commandes/creer', name: 'api_commandes_creer', methods: ['POST'])]
-    public function creer(Request $request, EntityManagerInterface $em, OrderManagerService $orderService): JsonResponse
+    public function creer(Request $request, EntityManagerInterface $em, OrderManagerService $orderService, TarifResolver $tarifResolver): JsonResponse
     {
         $data = json_decode($request->getContent(), true) ?? [];
 
+        $typeCommande = $data['typeCommande'] ?? 'DETAILLANT';
+        if (!in_array($typeCommande, ['GROSSISTE', 'DETAILLANT'], true)) {
+            return new JsonResponse(['success' => false, 'error' => 'Type de commande invalide'], 422);
+        }
+
         $c = new Commande();
         $c->setNumero($orderService->generateOrderNumber());
-        $c->setTypeCommande($data['typeCommande'] ?? 'DETAILLANT');
+        $c->setTypeCommande($typeCommande);
+        $c->setCreatedBy($this->getUser());
         $c->setDateCommande(new \DateTime());
         $c->setStatut('SOUMISE');
         $c->setObservation($data['observation'] ?? null);
@@ -93,28 +109,38 @@ class ApiCommandesController extends AbstractController
         if (!empty($data['grossiste_id'])) {
             $c->setGrossiste($em->getRepository(Grossiste::class)->find($data['grossiste_id']));
         }
-        if (!empty($data['agent_id'])) {
-            $c->setAgent($em->getRepository(AgentCommercial::class)->find($data['agent_id']));
+        // L'agent est celui du jeton JWT ; seul un délégué peut saisir pour le compte d'un autre agent
+        $agent = $this->getAgentConnecte($em);
+        if ($this->isGranted('ROLE_DELEGUE') && !empty($data['agent_id'])) {
+            $agent = $em->getRepository(AgentCommercial::class)->find($data['agent_id']);
         }
+        $c->setAgent($agent);
         if (!empty($data['delegue_id'])) {
             $c->setDelegue($em->getRepository(Delegue::class)->find($data['delegue_id']));
         }
         if (!empty($data['depot_id'])) {
             $c->setDepot($em->getRepository(Depot::class)->find($data['depot_id']));
         }
-        if (!empty($data['user_id'])) {
-            $c->setCreatedBy($em->getRepository(Utilisateur::class)->find($data['user_id']));
+        if (!$c->getGrossiste() && !$c->getDetailant()) {
+            return new JsonResponse(['success' => false, 'error' => 'Client introuvable'], 422);
         }
 
         $montantTotal = 0.0;
+        $lignesSansTarif = [];
         $lignes = $data['lignes'] ?? [];
         foreach ($lignes as $item) {
-            $p = $em->getRepository(Produit::class)->find($item['produit_id']);
-            $cond = $em->getRepository(Conditionnement::class)->find($item['conditionnement_id']);
-            if (!$p || !$cond) continue;
-
+            $p = $em->getRepository(Produit::class)->find($item['produit_id'] ?? 0);
+            $cond = $em->getRepository(Conditionnement::class)->find($item['conditionnement_id'] ?? 0);
             $qte = (float) ($item['quantite'] ?? 1);
-            $pu = (float) ($item['prixUnitaire'] ?? 0);
+            if (!$p || !$cond || $qte <= 0) continue;
+
+            // Prix imposé par la grille tarifaire : le prixUnitaire envoyé par l'app est ignoré
+            $tarif = $tarifResolver->resoudre($p, $cond, $typeCommande, $c->getGrossiste(), $c->getDetailant());
+            if (!$tarif || $tarif['prix'] <= 0) {
+                $lignesSansTarif[] = $p->getNom() . ' (' . $cond->getLibelle() . ')';
+                continue;
+            }
+            $pu = $tarif['prix'];
             $ligneMontant = $qte * $pu;
             $montantTotal += $ligneMontant;
 
@@ -129,6 +155,13 @@ class ApiCommandesController extends AbstractController
             $em->persist($cl);
         }
 
+        if ($lignesSansTarif) {
+            return new JsonResponse(['success' => false, 'error' => 'Aucun tarif actif pour : ' . implode(', ', $lignesSansTarif)], 422);
+        }
+        if ($montantTotal <= 0) {
+            return new JsonResponse(['success' => false, 'error' => 'Aucune ligne de commande valide'], 422);
+        }
+
         $c->setMontantTotal((string) $montantTotal);
         $em->persist($c);
         $em->flush();
@@ -140,5 +173,10 @@ class ApiCommandesController extends AbstractController
             'montantTotal' => $montantTotal,
             'statut' => $c->getStatut(),
         ], 201);
+    }
+
+    private function getAgentConnecte(EntityManagerInterface $em): ?AgentCommercial
+    {
+        return $em->getRepository(AgentCommercial::class)->findOneBy(['utilisateur' => $this->getUser(), 'actif' => true]);
     }
 }

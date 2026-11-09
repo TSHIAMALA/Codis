@@ -9,12 +9,13 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 
 #[ORM\Entity(repositoryClass: \App\Repository\UtilisateurRepository::class)]
+#[ORM\HasLifecycleCallbacks]
 #[ORM\Table(name: 'utilisateur')]
 class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
-    #[ORM\Column(type: 'bigint')]
+    #[ORM\Column(type: 'bigint', options: ['unsigned' => true])]
     private ?int $id = null;
 
     #[ORM\ManyToOne(targetEntity: Pays::class)]
@@ -44,6 +45,9 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(type: 'datetime_immutable', options: ['default' => 'CURRENT_TIMESTAMP'])]
     private ?\DateTimeImmutable $createdAt = null;
+
+    #[ORM\Column(type: 'datetime', nullable: true)]
+    private ?\DateTimeInterface $updatedAt = null;
 
     #[ORM\ManyToMany(targetEntity: Role::class, fetch: 'EAGER')]
     #[ORM\JoinTable(
@@ -78,6 +82,13 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
     public function isActif(): bool { return $this->actif; }
     public function setActif(bool $actif): self { $this->actif = $actif; return $this; }
     public function getCreatedAt(): ?\DateTimeImmutable { return $this->createdAt; }
+    public function getUpdatedAt(): ?\DateTimeInterface { return $this->updatedAt; }
+
+    #[ORM\PreUpdate]
+    public function marquerModification(): void
+    {
+        $this->updatedAt = new \DateTime();
+    }
 
     public function getRolesEntities(): Collection { return $this->rolesEntities; }
     public function addRoleEntity(Role $role): self {

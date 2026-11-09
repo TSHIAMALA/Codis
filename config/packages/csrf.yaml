@@ -1,4 +1,6 @@
-# Enable stateless CSRF protection for forms and logins/logouts
+# Les formulaires HTML de l'application utilisent des jetons CSRF classiques (session)
+# vérifiés par App\EventSubscriber\CsrfProtectionSubscriber (id "app"),
+# ainsi que "authenticate" (login) et "logout".
 framework:
     form:
         csrf_protection:
@@ -7,5 +9,3 @@ framework:
     csrf_protection:
         stateless_token_ids:
             - submit
-            - authenticate
-            - logout

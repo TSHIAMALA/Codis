@@ -97,6 +97,7 @@
             <button onclick="closeModal('modalEditGrossiste{{ g.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <form method="post" action="{{ path('app_grossiste_modifier', {id: g.id}) }}">
+            {{ include('_csrf.html.twig') }}
             <div class="modal-body">
                 <div class="form-group">
                     <label class="form-label">Raison Sociale</label>
@@ -150,6 +151,7 @@
             <button onclick="closeModal('modalDeleteGrossiste{{ g.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <form method="post" action="{{ path('app_grossiste_supprimer', {id: g.id}) }}">
+            {{ include('_csrf.html.twig') }}
             <div class="modal-body">
                 <p style="font-size: 14px; line-height: 1.6; color: var(--text-main);">
                     Voulez-vous désactiver le grossiste <strong class="text-gold">{{ g.raisonSociale }}</strong> ?
@@ -175,6 +177,7 @@
             <button onclick="closeModal('modalAddGrossiste')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <form method="post" action="{{ path('app_grossiste_nouveau') }}">
+            {{ include('_csrf.html.twig') }}
             <div class="modal-body">
                 <div class="form-group">
                     <label class="form-label">Raison Sociale *</label>
@@ -279,6 +282,7 @@
             <button onclick="closeModal('modalEditDetailant{{ d.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <form method="post" action="{{ path('app_detailant_modifier', {id: d.id}) }}">
+            {{ include('_csrf.html.twig') }}
             <div class="modal-body">
                 <div class="form-group">
                     <label class="form-label">Nom / Enseigne Point de Vente</label>
@@ -325,6 +329,7 @@
             <button onclick="closeModal('modalDeleteDetailant{{ d.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <form method="post" action="{{ path('app_detailant_supprimer', {id: d.id}) }}">
+            {{ include('_csrf.html.twig') }}
             <div class="modal-body">
                 <p style="font-size: 14px; line-height: 1.6; color: var(--text-main);">
                     Voulez-vous désactiver le détaillant <strong class="text-gold">{{ d.nom }}</strong> ?
@@ -350,6 +355,7 @@
             <button onclick="closeModal('modalAddDetailant')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <form method="post" action="{{ path('app_detailant_nouveau') }}">
+            {{ include('_csrf.html.twig') }}
             <div class="modal-body">
                 <div class="form-group">
                     <label class="form-label">Nom / Enseigne *</label>
@@ -438,6 +444,7 @@
             <button onclick="closeModal('modalEditAgent{{ a.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <form method="post" action="{{ path('app_agent_modifier', {id: a.id}) }}">
+            {{ include('_csrf.html.twig') }}
             <div class="modal-body">
                 <div class="form-group">
                     <label class="form-label">Compte Utilisateur</label>
@@ -487,6 +494,7 @@
             <button onclick="closeModal('modalDeleteAgent{{ a.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <form method="post" action="{{ path('app_agent_supprimer', {id: a.id}) }}">
+            {{ include('_csrf.html.twig') }}
             <div class="modal-body">
                 <p style="font-size: 14px; line-height: 1.6; color: var(--text-main);">
                     Voulez-vous désactiver l'agent commercial <strong class="text-gold">{{ a.utilisateur ? a.utilisateur.nomComplet : '' }}</strong> ?
@@ -512,6 +520,7 @@
             <button onclick="closeModal('modalAddAgent')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <form method="post" action="{{ path('app_agent_nouveau') }}">
+            {{ include('_csrf.html.twig') }}
             <div class="modal-body">
                 <div class="form-row">
                     <div class="form-group">

@@ -8,6 +8,16 @@ doctrine:
 
         profiling_collect_backtrace: '%kernel.debug%'
         use_savepoints: true
+        # Le serveur WAMP crée des tables MyISAM par défaut (sans transactions ni clés étrangères) :
+        # on impose InnoDB et la collation commune à toutes les tables existantes.
+        default_table_options:
+            engine: InnoDB
+            charset: utf8mb4
+            collation: utf8mb4_unicode_ci
+        # Mode strict : une valeur invalide (ENUM, troncature...) lève une erreur au lieu d'être
+        # silencieusement remplacée (1002 = PDO::MYSQL_ATTR_INIT_COMMAND)
+        options:
+            1002: "SET SESSION sql_mode = 'STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'"
     orm:
         auto_generate_proxy_classes: true
         enable_lazy_ghost_objects: true

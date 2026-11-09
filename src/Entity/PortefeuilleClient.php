@@ -10,7 +10,7 @@ class PortefeuilleClient
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
-    #[ORM\Column(type: 'bigint')]
+    #[ORM\Column(type: 'bigint', options: ['unsigned' => true])]
     private ?int $id = null;
 
     #[ORM\ManyToOne(targetEntity: AgentCommercial::class)]
@@ -21,7 +21,7 @@ class PortefeuilleClient
     #[ORM\JoinColumn(name: 'detailant_id', referencedColumnName: 'id', nullable: false)]
     private ?Detailant $detailant = null;
 
-    #[ORM\Column(type: 'date', options: ['default' => 'CURRENT_TIMESTAMP'])]
+    #[ORM\Column(type: 'date')] // initialisée dans le constructeur
     private ?\DateTimeInterface $dateAttribution = null;
 
     #[ORM\Column(type: 'date', nullable: true)]

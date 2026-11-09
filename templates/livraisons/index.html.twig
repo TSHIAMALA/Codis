@@ -7,8 +7,20 @@
 <div class="card-table">
     <div class="card-table-header">
         <div class="card-table-title"><i class="fa-solid fa-truck-fast"></i> Bons de Livraison</div>
-        <span class="badge badge-gold">{{ livraisons|length }} expéditions</span>
+        <span class="badge badge-gold">{{ livraisons.total }} expéditions</span>
     </div>
+
+    <form method="get" class="filtres">
+        <select name="statut" class="form-select" onchange="this.form.submit()" aria-label="Filtrer par statut">
+            <option value="">Tous les statuts</option>
+            {% for code, libelle in {PREPARATION: 'En préparation', EN_TRANSIT: 'En transit', RECEPTION_CONFIRMEE: 'Réception confirmée', ANNULEE: 'Annulée'} %}
+                <option value="{{ code }}" {% if app.request.query.get('statut') == code %}selected{% endif %}>{{ libelle }}</option>
+            {% endfor %}
+        </select>
+        {% if app.request.query.get('statut') %}
+            <a href="{{ path('app_livraison_index') }}" class="filtres-reset"><i class="fa-solid fa-xmark"></i> Réinitialiser</a>
+        {% endif %}
+    </form>
 
     <table class="custom-table">
         <thead>
@@ -66,36 +78,45 @@
                     {% endif %}
                 </td>
                 <td style="text-align: right; white-space: nowrap;">
-                    {% if l.statut == 'PREPARATION' %}
-                        {% if isDistAgree and not estPaye %}
+                    {% set ctrl = controles[l.id] ?? null %}
+                    {% if workflow_can(l, 'expedier') %}
+                        {% if ctrl and ctrl.paiementRequis %}
                             {# Distributeur Agréé non payé : bouton désactivé avec tooltip explicatif #}
                             <span style="position: relative; display: inline-block;" title="⚠️ Distributeur Agréé : le client doit d'abord verser le cash à la Caisse (Paiements & Crédits) avant de pouvoir expédier.">
                                 <button type="button" class="btn btn-outline btn-sm" disabled style="opacity: 0.5; cursor: not-allowed;">
                                     <i class="fa-solid fa-lock"></i> Paiement requis
                                 </button>
                             </span>
+                        {% elseif ctrl and ctrl.manquants is not empty %}
+                            <span style="display: inline-block;" title="Stock insuffisant au dépôt :&#10;{{ ctrl.manquants|join('&#10;') }}">
+                                <button type="button" class="btn btn-outline btn-sm" disabled style="opacity: 0.5; cursor: not-allowed; color: #ef4444;">
+                                    <i class="fa-solid fa-box-open"></i> Stock insuffisant
+                                </button>
+                            </span>
                         {% else %}
-                            <form method="post" action="{{ path('app_livraison_expedier', {id: l.id}) }}" style="display:inline;">
-                                <button type="submit" class="btn btn-primary btn-sm" title="Expédier"><i class="fa-solid fa-paper-plane"></i> Expédier</button>
+                            <form method="post" action="{{ path('app_livraison_expedier', {id: l.id}) }}" style="display:inline;" onsubmit="return confirm('Expédier le BL {{ l.numero }} ? Le stock sera sorti du dépôt.');">
+                                {{ include('_csrf.html.twig') }}
+                                <button type="submit" class="btn btn-primary btn-sm" title="Expédier et sortir le stock du dépôt"><i class="fa-solid fa-paper-plane"></i> Expédier</button>
                             </form>
                         {% endif %}
                     {% endif %}
 
-                    {% if l.statut in ['EN_TRANSIT', 'EXPEDIEE'] %}
+                    {% if workflow_can(l, 'confirmer') %}
                     <form method="post" action="{{ path('app_livraison_confirmer', {id: l.id}) }}" style="display:inline;">
+                        {{ include('_csrf.html.twig') }}
                         <button type="submit" class="btn btn-gold btn-sm" title="Confirmer la réception"><i class="fa-solid fa-square-check"></i> Confirmer</button>
                     </form>
                     {% endif %}
 
-                    {% if l.statut not in ['RECEPTION_CONFIRMEE', 'ANNULEE'] %}
+                    {% if workflow_can(l, 'annuler') %}
                         <button onclick="openModal('modalEditLivraison{{ l.id }}')" class="btn btn-outline btn-sm" title="Modifier"><i class="fa-solid fa-pen-to-square"></i></button>
-                        <button onclick="openModal('modalCancelLivraison{{ l.id }}')" class="btn btn-danger btn-sm" title="Annuler (suppression logique)"><i class="fa-solid fa-ban"></i></button>
+                        <button onclick="openModal('modalCancelLivraison{{ l.id }}')" class="btn btn-danger btn-sm" title="Annuler le BL"><i class="fa-solid fa-ban"></i></button>
                     {% endif %}
                 </td>
             </tr>
 
             {# Message d'aide pour les Distributeurs Agréés non payés #}
-            {% if l.statut == 'PREPARATION' and isDistAgree and not estPaye %}
+            {% if workflow_can(l, 'expedier') and (controles[l.id].paiementRequis ?? false) %}
             <tr>
                 <td colspan="8" style="padding: 8px 24px; background: rgba(220, 38, 38, 0.06); border-left: 3px solid var(--primary);">
                     <div style="display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-muted);">
@@ -116,6 +137,7 @@
             {% endfor %}
         </tbody>
     </table>
+    {{ include('_pagination.html.twig', {page: livraisons}) }}
 </div>
 
 <!-- Livraisons Modals (Rendered Outside Table) -->
@@ -128,6 +150,7 @@
             <button onclick="closeModal('modalEditLivraison{{ l.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <form method="post" action="{{ path('app_livraison_modifier', {id: l.id}) }}">
+            {{ include('_csrf.html.twig') }}
             <div class="modal-body">
                 <div class="form-group">
                     <label class="form-label">Commande Associée</label>
@@ -157,6 +180,7 @@
             <button onclick="closeModal('modalCancelLivraison{{ l.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <form method="post" action="{{ path('app_livraison_annuler', {id: l.id}) }}">
+            {{ include('_csrf.html.twig') }}
             <div class="modal-body">
                 <p style="font-size: 14px; line-height: 1.6; color: var(--text-main);">
                     Voulez-vous annuler le bon de livraison <strong class="text-gold">{{ l.numero }}</strong> ?
@@ -164,6 +188,11 @@
                 <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
                     Le statut passera à <strong>ANNULEE</strong> (suppression logique sans effacer la trace).
                 </p>
+                {% if l.statut in ['EN_TRANSIT', 'EXPEDIEE'] %}
+                <p style="font-size: 12px; color: #f59e0b; margin-top: 8px;">
+                    <i class="fa-solid fa-rotate-left"></i> Ce BL est en transit : la marchandise sera <strong>réintégrée au stock du dépôt</strong> (mêmes lots) et la commande redeviendra « Validée ».
+                </p>
+                {% endif %}
             </div>
             <div class="modal-footer">
                 <button type="button" onclick="closeModal('modalCancelLivraison{{ l.id }}')" class="btn btn-outline">Retour</button>

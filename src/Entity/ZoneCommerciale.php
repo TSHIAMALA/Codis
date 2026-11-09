@@ -6,11 +6,12 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'zone_commerciale')]
+#[ORM\UniqueConstraint(name: 'uk_zone_ville_code', columns: ['ville_id', 'code'])]
 class ZoneCommerciale
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
-    #[ORM\Column(type: 'bigint')]
+    #[ORM\Column(type: 'bigint', options: ['unsigned' => true])]
     private ?int $id = null;
 
     #[ORM\ManyToOne(targetEntity: Ville::class, inversedBy: 'zones')]

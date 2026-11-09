@@ -8,12 +8,13 @@ use App\Entity\Stock;
 use App\Entity\Grossiste;
 use App\Entity\Detailant;
 use App\Entity\Livraison;
-use App\Entity\Paiement;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
+#[IsGranted('ROLE_STAFF')]
 class DashboardController extends AbstractController
 {
     #[Route('/', name: 'app_home')]
@@ -26,64 +27,75 @@ class DashboardController extends AbstractController
         $totalProductions = $em->getRepository(Production::class)->count(['statut' => 'VALIDEE']);
         $livraisonsEnCours = $em->getRepository(Livraison::class)->count(['statut' => ['PREPARATION', 'EXPEDIEE', 'EN_TRANSIT']]);
 
-        // Calculate CA Total
-        $commandes = $em->getRepository(Commande::class)->findBy(['statut' => ['VALIDEE', 'EXPEDIEE', 'LIVREE', 'RECEPTIONNEE']]);
-        $chiffreAffaires = 0.0;
-        foreach ($commandes as $c) {
-            $chiffreAffaires += (float) $c->getMontantTotal();
-        }
+        // Chiffre d'affaires : somme calculée par la base
+        $chiffreAffaires = (float) $em->createQueryBuilder()
+            ->select('COALESCE(SUM(c.montantTotal), 0)')
+            ->from(Commande::class, 'c')
+            ->where('c.statut IN (:statuts)')
+            ->setParameter('statuts', ['VALIDEE', 'EXPEDIEE', 'LIVREE', 'RECEPTIONNEE'])
+            ->getQuery()->getSingleScalarResult();
 
-        $commandesRecentes = $em->getRepository(Commande::class)->findBy([], ['dateCommande' => 'DESC'], 6);
+        // Clients chargés dans la même requête (le nom du client est affiché sur chaque ligne)
+        $commandesRecentes = $em->createQueryBuilder()
+            ->select('c', 'g', 'd')
+            ->from(Commande::class, 'c')
+            ->leftJoin('c.grossiste', 'g')
+            ->leftJoin('c.detailant', 'd')
+            ->orderBy('c.dateCommande', 'DESC')
+            ->setMaxResults(6)
+            ->getQuery()->getResult();
 
-        // --- STOCKS STATISTICS & REGIONAL BREAKDOWN ---
-        $stocksAll = $em->getRepository(Stock::class)->findAll();
+        // --- STOCKS : totaux par emplacement calculés par la base, puis regroupés par région ---
+        $parEmplacement = $em->createQueryBuilder()
+            ->select(
+                'e.nom AS site', 'e.typeEmplacement AS type',
+                'rd.nom AS regionDepot', 'ru.nom AS regionUsine', 'pd.nom AS paysDepot',
+                'SUM(s.quantiteDisponible) AS disponible', 'SUM(s.quantiteReservee) AS reservee', 'SUM(s.quantiteTransit) AS transit'
+            )
+            ->from(Stock::class, 's')
+            ->join('s.emplacement', 'e')
+            ->leftJoin('e.depot', 'dep')
+            ->leftJoin('dep.region', 'rd')
+            ->leftJoin('dep.pays', 'pd')
+            ->leftJoin('e.usine', 'usi')
+            ->leftJoin('usi.region', 'ru')
+            ->groupBy('e.id', 'e.nom', 'e.typeEmplacement', 'rd.nom', 'ru.nom', 'pd.nom')
+            ->getQuery()->getArrayResult();
 
-        $totalStockDisponible = 0.0;
-        $totalStockReserve = 0.0;
-        $totalStockTransit = 0.0;
+        $totalStockDisponible = $totalStockReserve = $totalStockTransit = 0.0;
         $stocksParRegion = [];
+        foreach ($parEmplacement as $ligne) {
+            $regionNom = match (true) {
+                $ligne['type'] === 'DR' => 'Stock confié aux DR (en tournée)',
+                $ligne['regionDepot'] !== null => $ligne['regionDepot'],
+                $ligne['regionUsine'] !== null => $ligne['regionUsine'],
+                $ligne['paysDepot'] !== null => $ligne['paysDepot'],
+                default => 'Kinshasa & Centre',
+            };
 
-        foreach ($stocksAll as $s) {
-            $dispo = (float) $s->getQuantiteDisponible();
-            $reser = (float) $s->getQuantiteReservee();
-            $trans = (float) $s->getQuantiteTransit();
-
-            $totalStockDisponible += $dispo;
-            $totalStockReserve += $reser;
-            $totalStockTransit += $trans;
-
-            $regionNom = 'Kinshasa & Centre';
-            $emp = $s->getEmplacement();
-            if ($emp) {
-                if ($emp->getDepot() && $emp->getDepot()->getRegion()) {
-                    $regionNom = $emp->getDepot()->getRegion()->getNom();
-                } elseif ($emp->getUsine() && $emp->getUsine()->getRegion()) {
-                    $regionNom = $emp->getUsine()->getRegion()->getNom();
-                } elseif ($emp->getDepot() && $emp->getDepot()->getPays()) {
-                    $regionNom = $emp->getDepot()->getPays()->getNom();
-                }
+            $stocksParRegion[$regionNom] ??= ['nom' => $regionNom, 'disponible' => 0.0, 'reservee' => 0.0, 'transit' => 0.0, 'sites' => []];
+            $stocksParRegion[$regionNom]['disponible'] += (float) $ligne['disponible'];
+            $stocksParRegion[$regionNom]['reservee'] += (float) $ligne['reservee'];
+            $stocksParRegion[$regionNom]['transit'] += (float) $ligne['transit'];
+            if (!in_array($ligne['site'], $stocksParRegion[$regionNom]['sites'], true)) {
+                $stocksParRegion[$regionNom]['sites'][] = $ligne['site'];
             }
 
-            if (!isset($stocksParRegion[$regionNom])) {
-                $stocksParRegion[$regionNom] = [
-                    'nom' => $regionNom,
-                    'disponible' => 0.0,
-                    'reservee' => 0.0,
-                    'transit' => 0.0,
-                    'sites' => [],
-                ];
-            }
-            $stocksParRegion[$regionNom]['disponible'] += $dispo;
-            $stocksParRegion[$regionNom]['reservee'] += $reser;
-            $stocksParRegion[$regionNom]['transit'] += $trans;
-
-            $siteNom = $emp ? $emp->getNom() : '';
-            if ($siteNom && !in_array($siteNom, $stocksParRegion[$regionNom]['sites'])) {
-                $stocksParRegion[$regionNom]['sites'][] = $siteNom;
-            }
+            $totalStockDisponible += (float) $ligne['disponible'];
+            $totalStockReserve += (float) $ligne['reservee'];
+            $totalStockTransit += (float) $ligne['transit'];
         }
 
-        $grandTotalStock = $totalStockDisponible + $totalStockReserve + $totalStockTransit;
+        // Aperçu : dernières lignes de stock mises à jour, avec site, produit et lot en une requête
+        $stocksDispo = $em->createQueryBuilder()
+            ->select('s', 'e', 'p', 'l')
+            ->from(Stock::class, 's')
+            ->join('s.emplacement', 'e')
+            ->join('s.produit', 'p')
+            ->leftJoin('s.lot', 'l')
+            ->orderBy('s.updatedAt', 'DESC')
+            ->setMaxResults(6)
+            ->getQuery()->getResult();
 
         return $this->render('dashboard/index.html.twig', [
             'totalGrossistes' => $totalGrossistes,
@@ -96,9 +108,9 @@ class DashboardController extends AbstractController
             'totalStockDisponible' => $totalStockDisponible,
             'totalStockReserve' => $totalStockReserve,
             'totalStockTransit' => $totalStockTransit,
-            'grandTotalStock' => $grandTotalStock,
+            'grandTotalStock' => $totalStockDisponible + $totalStockReserve + $totalStockTransit,
             'stocksParRegion' => $stocksParRegion,
-            'stocksDispo' => array_slice($stocksAll, 0, 6),
+            'stocksDispo' => $stocksDispo,
         ]);
     }
 }

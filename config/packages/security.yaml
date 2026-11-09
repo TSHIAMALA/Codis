@@ -17,6 +17,7 @@ security:
             pattern: ^/api/login
             stateless: true
             provider: app_user_provider
+            user_checker: App\Security\UserChecker
             json_login:
                 check_path: /api/login
                 username_path: username
@@ -27,34 +28,43 @@ security:
             pattern: ^/api
             stateless: true
             provider: app_user_provider
+            user_checker: App\Security\UserChecker
             jwt: ~
         main:
             lazy: true
             provider: app_user_provider
+            user_checker: App\Security\UserChecker
+            access_denied_handler: App\Security\AccessDeniedHandler
             form_login:
                 login_path: app_login
                 check_path: app_login
                 default_target_path: app_dashboard
                 username_parameter: username
                 password_parameter: password
-                enable_csrf: false
+                enable_csrf: true
             logout:
                 path: app_logout
                 target: app_login
+                enable_csrf: true
 
+    # Codes de la table `role` préfixés par ROLE_ (voir Utilisateur::getRoles()).
+    # ROLE_STAFF = tout le personnel interne ayant accès à l'interface web.
     role_hierarchy:
-        ROLE_DELIVERY_MANAGER: ROLE_DELIVERER
-        ROLE_COMMISSION_MANAGER: ROLE_USER
-        ROLE_ADMIN: [ROLE_DELIVERY_MANAGER, ROLE_COMMISSION_MANAGER, ROLE_USER]
+        ROLE_SUPER_ADMIN: [ROLE_ADMIN_PAYS]
+        ROLE_ADMIN_PAYS: [ROLE_RESPONSABLE_USINE, ROLE_GESTIONNAIRE_DEPOT, ROLE_DELEGUE, ROLE_CAISSIER]
+        ROLE_DELEGUE: [ROLE_AGENT_COMMERCIAL]
+        ROLE_AGENT_COMMERCIAL: [ROLE_STAFF]
+        ROLE_RESPONSABLE_USINE: [ROLE_STAFF]
+        ROLE_GESTIONNAIRE_DEPOT: [ROLE_STAFF]
+        ROLE_CAISSIER: [ROLE_STAFF]
 
     # Note: Only the *first* matching rule is applied
     access_control:
         - { path: ^/login, roles: PUBLIC_ACCESS }
         - { path: ^/inscription, roles: PUBLIC_ACCESS }
         - { path: ^/api/login, roles: PUBLIC_ACCESS }
-        - { path: ^/api/register, roles: PUBLIC_ACCESS }
-        - { path: ^/images, roles: PUBLIC_ACCESS }
-        - { path: ^/favicon, roles: PUBLIC_ACCESS }
+        - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
+        - { path: ^/, roles: ROLE_USER }
 
 when@test:
     security:

@@ -4,13 +4,13 @@ namespace App\Controller;
 
 use App\Entity\Utilisateur;
 use App\Entity\Pays;
-use App\Entity\Role;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
-use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Security\Http\Authentication\AuthenticationUtils;
 
 class SecurityController extends AbstractController
@@ -58,6 +58,11 @@ class SecurityController extends AbstractController
                 return $this->redirectToRoute('app_register');
             }
 
+            if (mb_strlen($plainPassword) < UtilisateurController::MIN_PASSWORD_LENGTH) {
+                $this->addFlash('danger', 'Le mot de passe doit contenir au moins ' . UtilisateurController::MIN_PASSWORD_LENGTH . ' caractères.');
+                return $this->redirectToRoute('app_register');
+            }
+
             // Check if username or email exists
             $existingUser = $em->getRepository(Utilisateur::class)->findOneBy(['username' => $username]);
             if ($existingUser) {
@@ -79,7 +84,8 @@ class SecurityController extends AbstractController
             $u->setUsername($username);
             $u->setEmail($email ?: null);
             $u->setTelephone($telephone ?: null);
-            $u->setActif(true);
+            // Compte inactif et sans rôle : un administrateur doit valider la demande (Utilisateurs & Accès)
+            $u->setActif(false);
 
             // Hash password
             $hashedPassword = $hasher->hashPassword($u, $plainPassword);
@@ -90,16 +96,10 @@ class SecurityController extends AbstractController
                 if ($pays) $u->setPays($pays);
             }
 
-            // Assign default role (COMMERCIAL or USER)
-            $roleUser = $em->getRepository(Role::class)->findOneBy(['code' => 'COMMERCIAL']);
-            if ($roleUser) {
-                $u->addRoleEntity($roleUser);
-            }
-
             $em->persist($u);
             $em->flush();
 
-            $this->addFlash('success', 'Votre compte a été créé avec succès ! Vous pouvez maintenant vous connecter.');
+            $this->addFlash('success', 'Demande d\'accès envoyée ! Un administrateur doit valider votre compte avant votre première connexion.');
             return $this->redirectToRoute('app_login');
         }
 

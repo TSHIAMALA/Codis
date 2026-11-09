@@ -165,7 +165,7 @@
 <div class="card-table">
     <div class="card-table-header">
         <div class="card-table-title">
-            <i class="fa-solid fa-list-check text-gold"></i> Registre Détaillé des Tarifs en Vigueur ({{ tarifs|length }})
+            <i class="fa-solid fa-list-check text-gold"></i> Registre Détaillé des Tarifs en Vigueur ({{ tarifs.total }})
         </div>
     </div>
 
@@ -237,11 +237,13 @@
                         <td style="text-align: right;">
                             <div style="display: inline-flex; gap: 6px;">
                                 <form method="POST" action="{{ path('app_tarif_toggle', {id: t.id}) }}" style="display: inline;">
+                                    {{ include('_csrf.html.twig') }}
                                     <button type="submit" class="btn btn-outline btn-sm" title="Activer / Désactiver ce tarif" style="padding: 4px 8px;">
                                         <i class="fa-solid {% if t.actif %}fa-toggle-on text-success{% else %}fa-toggle-off text-muted{% endif %}" style="font-size: 14px;"></i>
                                     </button>
                                 </form>
                                 <form method="POST" action="{{ path('app_tarif_delete', {id: t.id}) }}" onsubmit="return confirm('Confirmez-vous la suppression de ce tarif ?');" style="display: inline;">
+                                    {{ include('_csrf.html.twig') }}
                                     <button type="submit" class="btn btn-outline btn-sm" title="Supprimer" style="padding: 4px 8px; color: #ef4444; border-color: rgba(239,68,68,0.3);">
                                         <i class="fa-solid fa-trash"></i>
                                     </button>
@@ -259,6 +261,7 @@
                 {% endfor %}
             </tbody>
         </table>
+        {{ include('_pagination.html.twig', {page: tarifs}) }}
     </div>
 </div>
 
@@ -272,6 +275,7 @@
             <button type="button" class="modal-close" onclick="closeModal('modalNouveauTarif')">&times;</button>
         </div>
         <form method="POST" action="{{ path('app_tarif_nouveau') }}">
+            {{ include('_csrf.html.twig') }}
             <div class="modal-body">
                 <div class="form-row">
                     <div class="form-group">
