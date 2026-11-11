@@ -1117,6 +1117,47 @@ html[data-sidebar="collapsed"] main.main-content {
 	padding: 24px;
 }
 
+/* Agrandissement des fenêtres modales */
+.modal-content {
+	transition: transform 0.25s ease, background-color 0.25s ease, max-width 0.25s ease, width 0.25s ease;
+}
+
+.modal-actions {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	flex-shrink: 0;
+}
+
+.modal-maximize {
+	background: transparent;
+	border: none;
+	color: var(--text-muted);
+	font-size: 15px;
+	cursor: pointer;
+	padding: 6px 9px;
+	border-radius: 6px;
+	transition: all 0.2s;
+}
+
+.modal-maximize:hover,
+.modal-maximize:focus-visible {
+	color: var(--gold);
+	background: var(--nav-hover-bg);
+	outline: none;
+}
+
+.modal-header {
+	user-select: none;
+}
+
+.modal-content.modal-maximized {
+	width: calc(100vw - 32px);
+	max-width: none !important;
+	max-height: calc(100vh - 32px);
+	border-radius: 12px;
+}
+
 .modal-footer {
 	padding: 16px 24px;
 	border-top: 1px solid var(--border-subtle);

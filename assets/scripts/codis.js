@@ -84,6 +84,50 @@ function closeModal(id) {
 		modal.classList.remove('active');
 }
 
+// Bouton « agrandir » ajouté automatiquement dans l'en-tête de chaque fenêtre modale.
+function toggleModalSize(content) {
+	const maximized = content.classList.toggle('modal-maximized');
+	const btn = content.querySelector('.modal-maximize');
+	if (btn) {
+		const label = maximized ? 'Réduire la fenêtre' : 'Agrandir la fenêtre';
+		btn.title = label;
+		btn.setAttribute('aria-label', label);
+		btn.setAttribute('aria-pressed', maximized ? 'true' : 'false');
+		btn.innerHTML = '<i class="fa-solid ' + (maximized ? 'fa-down-left-and-up-right-to-center' : 'fa-up-right-and-down-left-from-center') + '"></i>';
+	}
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+	document.querySelectorAll('.modal-content > .modal-header').forEach(function (header) {
+		const content = header.parentElement;
+		const close = header.querySelector('.modal-close');
+		const actions = document.createElement('div');
+		actions.className = 'modal-actions';
+		const btn = document.createElement('button');
+		btn.type = 'button';
+		btn.className = 'modal-maximize';
+		btn.title = 'Agrandir la fenêtre';
+		btn.setAttribute('aria-label', 'Agrandir la fenêtre');
+		btn.setAttribute('aria-pressed', 'false');
+		btn.innerHTML = '<i class="fa-solid fa-up-right-and-down-left-from-center"></i>';
+		btn.addEventListener('click', function () {
+			toggleModalSize(content);
+		});
+		actions.appendChild(btn);
+		if (close) {
+			header.insertBefore(actions, close);
+			actions.appendChild(close);
+		} else {
+			header.appendChild(actions);
+		}
+		// Double-clic sur la barre de titre = agrandir / réduire
+		header.addEventListener('dblclick', function (e) {
+			if (!e.target.closest('button'))
+				toggleModalSize(content);
+		});
+	});
+});
+
 document.addEventListener('click', function (e) {
 	if (e.target.classList.contains('modal-backdrop')) {
 		e.target.classList.remove('active');
