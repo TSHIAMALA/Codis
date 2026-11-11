@@ -281,6 +281,7 @@
                 <th>Point de Vente</th>
                 <th>Responsable</th>
                 <th>Téléphone</th>
+                <th>Pays / Région</th>
                 <th>Adresse</th>
                 <th>Statut</th>
                 <th style="text-align: right;">Actions</th>
@@ -293,6 +294,10 @@
                 <td class="font-bold">{{ d.nom }}</td>
                 <td>{{ d.nomResponsable }}</td>
                 <td>{{ d.telephone }}</td>
+                <td>
+                    {{ d.pays ? d.pays.nom : '—' }}
+                    {% if d.region %}<div style="font-size: 12px; color: var(--text-muted);">{{ d.region.nom }}</div>{% endif %}
+                </td>
                 <td>{{ d.adresse }}</td>
                 <td>
                     {% if d.statut == 'ACTIF' %}
@@ -310,6 +315,30 @@
         </tbody>
     </table>
 </div>
+
+{# Pays + région du détaillant : la liste des régions suit le pays choisi (voir filtrerRegions) #}
+{% macro localisationDetailant(paysList, regions, detailant = null) %}
+    {% set paysCourant = detailant and detailant.pays ? detailant.pays.id : (paysList|first ? (paysList|first).id : null) %}
+    <div class="form-row">
+        <div class="form-group">
+            <label class="form-label">Pays *</label>
+            <select name="pays_id" class="form-select" required onchange="filtrerRegions(this)">
+                {% for p in paysList %}
+                    <option value="{{ p.id }}" {% if p.id == paysCourant %}selected{% endif %}>{{ p.nom }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Région *</label>
+            <select name="region_id" class="form-select" required data-region-select>
+                <option value="">-- Choisir une région --</option>
+                {% for r in regions %}
+                    <option value="{{ r.id }}" data-pays="{{ r.pays ? r.pays.id : '' }}" {% if detailant and detailant.region and detailant.region.id == r.id %}selected{% endif %}>{{ r.nom }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+{% endmacro %}
 
 <!-- Detailants Modals (Rendered Outside Table) -->
 {% for d in detailants %}
@@ -340,6 +369,7 @@
                     <label class="form-label">Email</label>
                     <input type="email" name="email" class="form-control" value="{{ d.email }}">
                 </div>
+                {{ _self.localisationDetailant(paysList, regions, d) }}
                 <div class="form-group">
                     <label class="form-label">Adresse</label>
                     <input type="text" name="adresse" class="form-control" value="{{ d.adresse }}">
@@ -413,6 +443,7 @@
                     <label class="form-label">Email</label>
                     <input type="email" name="email" class="form-control" placeholder="kintambo@gmail.com">
                 </div>
+                {{ _self.localisationDetailant(paysList, regions) }}
                 <div class="form-group">
                     <label class="form-label">Adresse Physique</label>
                     <input type="text" name="adresse" class="form-control" placeholder="Av. Kasavubu, N° 45">
@@ -425,6 +456,21 @@
         </form>
     </div>
 </div>
+<script>
+// N'affiche que les régions du pays choisi ; vide la région si elle n'appartient plus au pays.
+function filtrerRegions(paysSelect) {
+    var region = paysSelect.closest('form').querySelector('[data-region-select]');
+    if (!region) { return; }
+    region.querySelectorAll('option[data-pays]').forEach(function(o) {
+        o.hidden = o.dataset.pays !== paysSelect.value;
+        if (o.hidden && o.selected) { region.value = ''; }
+    });
+}
+document.querySelectorAll('[data-region-select]').forEach(function(r) {
+    var pays = r.closest('form').querySelector('select[name="pays_id"]');
+    if (pays) { filtrerRegions(pays); }
+});
+</script>
 {% endif %}
 
 {% if activeTab in ['all', 'agents'] %}

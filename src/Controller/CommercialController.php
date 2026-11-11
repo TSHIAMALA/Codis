@@ -151,13 +151,9 @@ class CommercialController extends AbstractController
         $d->setAdresse($request->request->get('adresse'));
         $d->setStatut('ACTIF');
 
-        $paysId = $request->request->get('pays_id');
-        if ($paysId) {
-            $pays = $em->getRepository(Pays::class)->find($paysId);
-            if ($pays) $d->setPays($pays);
-        } else {
-            $pays = $em->getRepository(Pays::class)->findOneBy(['actif' => true]);
-            if ($pays) $d->setPays($pays);
+        if ($erreur = $this->appliquerLocalisationDetailant($d, $request, $em)) {
+            $this->addFlash('danger', $erreur);
+            return $this->redirectToRoute('app_commercial_index', ['tab' => 'detailants']);
         }
 
         $em->persist($d);
@@ -177,9 +173,43 @@ class CommercialController extends AbstractController
         $d->setAdresse($request->request->get('adresse', $d->getAdresse()));
         $d->setStatut($request->request->get('statut', $d->getStatut()));
 
+        if ($erreur = $this->appliquerLocalisationDetailant($d, $request, $em)) {
+            $em->clear();
+            $this->addFlash('danger', $erreur);
+            return $this->redirectToRoute('app_commercial_index', ['tab' => 'detailants']);
+        }
+
         $em->flush();
         $this->addFlash('info', 'Détaillant ' . $d->getNom() . ' mis à jour.');
         return $this->redirectToRoute('app_commercial_index', ['tab' => 'detailants']);
+    }
+
+    /**
+     * Pays et région du détaillant (obligatoires) ; la région doit appartenir au pays choisi.
+     *
+     * @return string|null message d'erreur, null si tout est valide
+     */
+    private function appliquerLocalisationDetailant(Detailant $d, Request $request, EntityManagerInterface $em): ?string
+    {
+        $paysId = $request->request->get('pays_id');
+        $regionId = $request->request->get('region_id');
+        $pays = $paysId ? $em->getRepository(Pays::class)->find($paysId) : null;
+        $region = $regionId ? $em->getRepository(Region::class)->find($regionId) : null;
+
+        if (!$pays) {
+            return 'Veuillez choisir le pays du détaillant.';
+        }
+        if (!$region) {
+            return 'Veuillez choisir la région du détaillant.';
+        }
+        if ($region->getPays() !== $pays) {
+            return 'La région ' . $region->getNom() . ' n\'appartient pas au pays ' . $pays->getNom() . '.';
+        }
+
+        $d->setPays($pays);
+        $d->setRegion($region);
+
+        return null;
     }
 
     #[Route('/detailant/{id}/supprimer', name: 'app_detailant_supprimer', methods: ['POST'])]
