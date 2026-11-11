@@ -45,6 +45,7 @@ class ProductionController extends AbstractController
             'productions' => $productions,
             'usines' => $usines,
             'produits' => $produits,
+            'conditionnements' => $em->getRepository(Conditionnement::class)->findBy([], ['niveau' => 'DESC']),
             'lots' => $lots,
         ]);
     }
@@ -60,9 +61,15 @@ class ProductionController extends AbstractController
 
         $usine = $usineId ? $em->getRepository(Usine::class)->find($usineId) : null;
         $produit = $produitId ? $em->getRepository(Produit::class)->find($produitId) : null;
+        $conditionnementId = $request->request->get('conditionnement_id');
+        $cond = $conditionnementId ? $em->getRepository(Conditionnement::class)->find($conditionnementId) : null;
 
-        if (!$usine || !$produit || (float)$quantite <= 0) {
-            $this->addFlash('danger', 'Veuillez sélectionner une usine, un produit et saisir une quantité valide.');
+        if (!$usine || !$produit || !$cond || (float)$quantite <= 0) {
+            $this->addFlash('danger', 'Veuillez sélectionner une usine, un produit, son conditionnement et saisir une quantité valide.');
+            return $this->redirectToRoute('app_production_index');
+        }
+        if ($cond->getProduit() !== $produit) {
+            $this->addFlash('danger', 'Le conditionnement choisi ne correspond pas au produit.');
             return $this->redirectToRoute('app_production_index');
         }
 
@@ -86,9 +93,6 @@ class ProductionController extends AbstractController
         $lot->setDateExpiration((clone $dateProd)->modify('+2 years'));
         $lot->setStatut('ACTIF');
         $em->persist($lot);
-
-        // Find conditionnement for this product
-        $cond = $em->getRepository(Conditionnement::class)->findOneBy(['produit' => $produit]);
 
         // Create Production Ligne
         $ligne = new ProductionLigne();

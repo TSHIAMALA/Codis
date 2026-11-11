@@ -5,6 +5,8 @@
         Détail Stocks par Emplacement & Lot — Industrie & Stocks
     {% elseif activeTab == 'mouvements' %}
         Historique Mouvements de Stock — Industrie & Stocks
+    {% elseif activeTab == 'transferts' %}
+        Transferts entre Sites — Industrie & Stocks
     {% else %}
         Synthèse des Stocks par Produit — Industrie & Stocks
     {% endif %}
@@ -15,6 +17,8 @@
         Traçabilité par usine, dépôt central, numéro de lot et conditionnement
     {% elseif activeTab == 'mouvements' %}
         Journal d'audit des entrées, sorties et transferts inter-dépôts
+    {% elseif activeTab == 'transferts' %}
+        Approvisionnement des dépôts depuis les usines et entre dépôts : expédition, transit, réception
     {% else %}
         Niveaux de stocks disponibles et cumulés sur l'ensemble des sites
     {% endif %}
@@ -31,6 +35,9 @@
     </a>
     <a href="{{ path('app_stock_index', {tab: 'mouvements'}) }}" class="btn {% if activeTab == 'mouvements' %}btn-gold{% else %}btn-outline{% endif %} btn-sm">
         <i class="fa-solid fa-timeline"></i> Historique Mouvements ({{ mouvements.total }})
+    </a>
+    <a href="{{ path('app_stock_index', {tab: 'transferts'}) }}" class="btn {% if activeTab == 'transferts' %}btn-gold{% else %}btn-outline{% endif %} btn-sm">
+        <i class="fa-solid fa-truck-arrow-right"></i> Transferts entre Sites ({{ transferts.total }})
     </a>
 </div>
 
@@ -158,5 +165,176 @@
     </table>
     {{ include('_pagination.html.twig', {page: mouvements}) }}
 </div>
+{% endif %}
+{% if activeTab == 'transferts' %}
+{% set peutTransferer = is_granted('ROLE_RESPONSABLE_USINE') or is_granted('ROLE_GESTIONNAIRE_DEPOT') %}
+<div class="card-table">
+    <div class="card-table-header">
+        <div class="card-table-title"><i class="fa-solid fa-truck-arrow-right text-gold"></i> Transferts entre Sites</div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <span class="badge badge-gold">{{ transferts.total }} transferts</span>
+            {% if peutTransferer %}
+                <button onclick="openModal('modalNouveauTransfert')" class="btn btn-gold btn-sm"><i class="fa-solid fa-plus"></i> Nouveau Transfert</button>
+            {% endif %}
+        </div>
+    </div>
+    <table class="custom-table">
+        <thead>
+            <tr>
+                <th>N° Transfert</th>
+                <th>Départ</th>
+                <th>Arrivée</th>
+                <th>Marchandise (par lot)</th>
+                <th>Expédié le</th>
+                <th>Statut</th>
+                <th style="text-align: right;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for t in transferts %}
+            <tr>
+                <td class="font-bold text-gold">{{ t.numero }}</td>
+                <td>{{ t.emplacementSource ? t.emplacementSource.nom : '-' }}</td>
+                <td>{{ t.emplacementDestination ? t.emplacementDestination.nom : '-' }}</td>
+                <td style="font-size: 12px;">
+                    {% for l in t.lignes %}
+                        <div>{{ l.quantiteEnvoyee|number_format(0, ',', ' ') }} {{ l.conditionnement ? l.conditionnement.libelle : '' }} · {{ l.produit ? l.produit.nom : '' }}{% if l.lot %} <span class="badge badge-gold" style="font-size: 10px;">{{ l.lot.numeroLot }}</span>{% endif %}</div>
+                    {% else %}
+                        <span style="color: var(--text-muted);">-</span>
+                    {% endfor %}
+                </td>
+                <td>{{ t.dateExpedition ? t.dateExpedition|date('d/m/Y H:i') : '-' }}</td>
+                <td>
+                    {% if t.statut == 'RECEPTIONNE' %}
+                        <span class="badge badge-success"><i class="fa-solid fa-check"></i> Réceptionné{% if t.dateReception %} le {{ t.dateReception|date('d/m') }}{% endif %}</span>
+                    {% elseif t.statut in ['EN_TRANSIT', 'EXPEDIE'] %}
+                        <span class="badge badge-info"><i class="fa-solid fa-truck"></i> En transit</span>
+                    {% elseif t.statut == 'ANNULE' %}
+                        <span class="badge badge-danger">Annulé</span>
+                    {% else %}
+                        <span class="badge badge-primary">{{ t.statut }}</span>
+                    {% endif %}
+                </td>
+                <td style="text-align: right; white-space: nowrap;">
+                    {% if workflow_can(t, 'receptionner') and is_granted('ROLE_GESTIONNAIRE_DEPOT') %}
+                        <form method="post" action="{{ path('app_transfert_receptionner', {id: t.id}) }}" style="display: inline;" onsubmit="return confirm('Confirmer la réception du transfert {{ t.numero }} au dépôt « {{ t.emplacementDestination.nom }} » ?');">
+                            {{ include('_csrf.html.twig') }}
+                            <button type="submit" class="btn btn-gold btn-sm"><i class="fa-solid fa-square-check"></i> Réceptionner</button>
+                        </form>
+                    {% endif %}
+                    {% if workflow_can(t, 'annuler') and peutTransferer %}
+                        <form method="post" action="{{ path('app_transfert_annuler', {id: t.id}) }}" style="display: inline;" onsubmit="return confirm('Annuler le transfert {{ t.numero }} ? La marchandise revient au site de départ.');">
+                            {{ include('_csrf.html.twig') }}
+                            <button type="submit" class="btn btn-danger btn-sm" title="Annuler le transfert"><i class="fa-solid fa-ban"></i></button>
+                        </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 32px;">Aucun transfert enregistré.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {{ include('_pagination.html.twig', {page: transferts}) }}
+</div>
+
+{% if peutTransferer %}
+<div id="modalNouveauTransfert" class="modal-backdrop">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-truck-arrow-right text-gold"></i> Nouveau Transfert entre Sites</div>
+            <button onclick="closeModal('modalNouveauTransfert')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="post" action="{{ path('app_transfert_nouveau') }}">
+            {{ include('_csrf.html.twig') }}
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Site de départ *</label>
+                        <select name="source_id" id="trfSource" class="form-select" required onchange="majTransfert()">
+                            <option value="">-- Usine ou dépôt --</option>
+                            {% for e in sitesTransfert %}
+                                <option value="{{ e.id }}">{{ e.nom }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Dépôt d'arrivée *</label>
+                        <select name="destination_id" id="trfDestination" class="form-select" required>
+                            <option value="">-- Dépôt --</option>
+                            {% for e in sitesTransfert|filter(e => e.typeEmplacement == 'DEPOT') %}
+                                <option value="{{ e.id }}">{{ e.nom }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Produit *</label>
+                        <select name="produit_id" id="trfProduit" class="form-select" required onchange="filtrerCondTransfert()">
+                            <option value="">-- Produit --</option>
+                            {% for p in produits %}
+                                <option value="{{ p.id }}">{{ p.nom }} ({{ p.code }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Conditionnement *</label>
+                        <select name="conditionnement_id" id="trfCond" class="form-select" required onchange="majTransfert()">
+                            <option value="">-- Choisir le produit d'abord --</option>
+                            {% for c in conditionnements %}
+                                <option value="{{ c.id }}" data-produit="{{ c.produit ? c.produit.id : '' }}" hidden>{{ c.libelle }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Quantité à expédier *</label>
+                    <input type="number" step="0.001" min="0.001" name="quantite" id="trfQte" class="form-control" required oninput="majTransfert()">
+                    <div id="trfDispo" style="font-size: 11px; margin-top: 4px; color: var(--text-muted);"></div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Observation</label>
+                    <input type="text" name="observation" class="form-control" placeholder="ex: réapprovisionnement hebdomadaire, camion KN-1234">
+                </div>
+                <p style="font-size: 12px; color: var(--text-muted);"><i class="fa-solid fa-circle-info"></i> Le stock quitte le site de départ dès l'expédition (lots les plus proches de la péremption d'abord) et n'entre au dépôt qu'à sa réception.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('modalNouveauTransfert')" class="btn btn-outline">Annuler</button>
+                <button type="submit" class="btn btn-gold"><i class="fa-solid fa-paper-plane"></i> Expédier</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+var disponiblesParSite = {{ disponiblesParSite|json_encode|raw }};
+function filtrerCondTransfert() {
+    var produit = document.getElementById('trfProduit').value;
+    var select = document.getElementById('trfCond');
+    var visibles = [];
+    select.querySelectorAll('option[data-produit]').forEach(function(o) {
+        o.hidden = o.dataset.produit !== produit;
+        if (!o.hidden) visibles.push(o);
+    });
+    select.options[0].textContent = produit ? '-- Unité --' : "-- Choisir le produit d'abord --";
+    select.value = visibles.length ? visibles[0].value : '';
+    majTransfert();
+}
+function majTransfert() {
+    var site = document.getElementById('trfSource').value;
+    var cond = document.getElementById('trfCond').value;
+    var qte = parseFloat(document.getElementById('trfQte').value) || 0;
+    var info = document.getElementById('trfDispo');
+    // Le dépôt de départ ne peut pas être aussi la destination
+    document.querySelectorAll('#trfDestination option[value]').forEach(function(o) { if (o.value) o.hidden = o.value === site; });
+    if (document.getElementById('trfDestination').value === site) document.getElementById('trfDestination').value = '';
+    if (!site || !cond) { info.textContent = ''; return; }
+    var dispo = (disponiblesParSite[site] && disponiblesParSite[site][cond]) || 0;
+    info.style.color = qte > dispo ? '#ef4444' : 'var(--text-muted)';
+    info.innerHTML = '<i class="fa-solid fa-warehouse"></i> Disponible au départ : <strong>' + dispo.toLocaleString('fr-FR') + '</strong>' + (qte > dispo ? ' — quantité supérieure au stock, l\'expédition sera refusée' : '');
+}
+</script>
+{% endif %}
 {% endif %}
 {% endblock %}

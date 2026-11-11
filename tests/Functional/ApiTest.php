@@ -113,6 +113,37 @@ class ApiTest extends AppWebTestCase
         self::assertResponseStatusCodeSame(409);
     }
 
+    public function testCatalogueAfficheLePrixFacture(): void
+    {
+        // La DR est en région Kinshasa ; l'app saisit des commandes de détaillants : 480 $ le carton
+        $jeton = $this->login(AppFixtures::DR)['token'];
+        $this->client->request('GET', '/api/produits', server: ['HTTP_AUTHORIZATION' => 'Bearer ' . $jeton]);
+
+        $produits = json_decode($this->client->getResponse()->getContent(), true);
+        $produitA = array_values(array_filter($produits, fn ($p) => $p['code'] === AppFixtures::PRODUIT_A))[0];
+        $carton = array_values(array_filter($produitA['conditionnements'], fn ($c) => $c['libelle'] === 'Carton'))[0];
+        self::assertEquals(480, $carton['prix']);
+        self::assertSame('Tarif Région : Kinshasa', $carton['prixSource']);
+    }
+
+    public function testCommandeMobileSansDepotEstLivrable(): void
+    {
+        $jeton = $this->login(AppFixtures::DR)['token'];
+        $detaillant = $this->em()->getRepository(\App\Entity\Detailant::class)->findOneBy(['code' => AppFixtures::DETAILLANT]);
+
+        // Charge utile de l'application mobile : pas de dépôt
+        $this->client->jsonRequest('POST', '/api/commandes/creer', [
+            'typeCommande' => 'DETAILLANT',
+            'detailant_id' => $detaillant->getId(),
+            'lignes' => [['produit_id' => $this->produit(AppFixtures::PRODUIT_A)->getId(), 'conditionnement_id' => $this->carton(AppFixtures::PRODUIT_A)->getId(), 'quantite' => 2, 'prixUnitaire' => 480]],
+        ], ['HTTP_AUTHORIZATION' => 'Bearer ' . $jeton]);
+
+        self::assertResponseStatusCodeSame(201);
+        $commande = $this->em()->getRepository(Commande::class)->find(json_decode($this->client->getResponse()->getContent(), true)['id']);
+        self::assertSame(AppFixtures::DEPOT, $commande->getDepot()->getCode(), 'Dépôt de la région de l\'agent');
+        self::assertSame('960.00', $commande->getMontantTotal());
+    }
+
     private function login(string $username): array
     {
         $this->client->jsonRequest('POST', '/api/login', ['username' => $username, 'password' => AppFixtures::MOT_DE_PASSE]);

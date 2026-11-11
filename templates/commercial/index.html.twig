@@ -55,7 +55,8 @@
                 <th>Code</th>
                 <th>Raison Sociale</th>
                 <th>Responsable</th>
-                <th>Téléphone</th>
+                <th>Type</th>
+                <th>DR du secteur</th>
                 <th>Limite de Crédit</th>
                 <th>Statut</th>
                 <th style="text-align: right;">Actions</th>
@@ -67,8 +68,9 @@
                 <td class="font-bold">{{ g.code }}</td>
                 <td class="font-bold">{{ g.raisonSociale }}</td>
                 <td>{{ g.nomResponsable }}</td>
-                <td>{{ g.telephone }}</td>
-                <td class="font-bold text-gold">{{ g.limiteCredit|number_format(2, ',', ' ') }} $</td>
+                <td>{% if g.typeDistribution == 'DISTRIBUTEUR_AGREE' %}<span class="badge badge-gold" title="Paiement à la caisse avant toute livraison">Distributeur agréé</span>{% else %}<span class="badge badge-info" title="Vente à crédit dans la limite autorisée">Grossiste secteur</span>{% endif %}</td>
+                <td>{{ g.dr and g.dr.utilisateur ? g.dr.utilisateur.nomComplet : '-' }}</td>
+                <td class="font-bold text-gold">{{ g.typeDistribution == 'DISTRIBUTEUR_AGREE' ? 'Paiement préalable' : g.limiteCredit|number_format(2, ',', ' ') ~ ' $' }}</td>
                 <td>
                     {% if g.statut == 'ACTIF' %}
                         <span class="badge badge-success">Actif</span>
@@ -119,8 +121,26 @@
                         <input type="email" name="email" class="form-control" value="{{ g.email }}">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Limite de Crédit ($)</label>
+                        <label class="form-label" title="Ne s'applique qu'aux grossistes secteur">Limite de Crédit ($) <span style="font-weight: 400; color: var(--text-muted);">· grossiste secteur</span></label>
                         <input type="number" step="0.01" name="limiteCredit" class="form-control" value="{{ g.limiteCredit }}">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Type de distribution *</label>
+                        <select name="typeDistribution" class="form-select" required>
+                            <option value="DISTRIBUTEUR_AGREE" {% if g.typeDistribution == 'DISTRIBUTEUR_AGREE' %}selected{% endif %}>Distributeur agréé — paie avant livraison</option>
+                            <option value="GROSSISTE_SECTEUR" {% if g.typeDistribution == 'GROSSISTE_SECTEUR' %}selected{% endif %}>Grossiste secteur — crédit plafonné</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">DR du secteur</label>
+                        <select name="dr_id" class="form-select">
+                            <option value="">-- Aucun --</option>
+                            {% for a in agents|filter(a => a.typeAgent == 'DR' and a.actif) %}
+                                <option value="{{ a.id }}" {% if g.dr and g.dr.id == a.id %}selected{% endif %}>{{ a.utilisateur.nomComplet }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
                 </div>
                 <div class="form-group">
@@ -199,8 +219,26 @@
                         <input type="email" name="email" class="form-control" placeholder="contact@bumba.cd">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Limite de Crédit ($)</label>
+                        <label class="form-label" title="Ne s'applique qu'aux grossistes secteur">Limite de Crédit ($) <span style="font-weight: 400; color: var(--text-muted);">· grossiste secteur</span></label>
                         <input type="number" step="0.01" name="limiteCredit" class="form-control" value="10000.00">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Type de distribution *</label>
+                        <select name="typeDistribution" class="form-select" required>
+                            <option value="DISTRIBUTEUR_AGREE" {% if 'DISTRIBUTEUR_AGREE' == 'DISTRIBUTEUR_AGREE' %}selected{% endif %}>Distributeur agréé — paie avant livraison</option>
+                            <option value="GROSSISTE_SECTEUR" {% if 'DISTRIBUTEUR_AGREE' == 'GROSSISTE_SECTEUR' %}selected{% endif %}>Grossiste secteur — crédit plafonné</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">DR du secteur</label>
+                        <select name="dr_id" class="form-select">
+                            <option value="">-- Aucun --</option>
+                            {% for a in agents|filter(a => a.typeAgent == 'DR' and a.actif) %}
+                                <option value="{{ a.id }}" >{{ a.utilisateur.nomComplet }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
                 </div>
                 <div class="form-group">
@@ -404,9 +442,10 @@
         <thead>
             <tr>
                 <th>Nom & Prénom</th>
-                <th>Username</th>
+                <th>Identifiant</th>
+                <th>Fonction</th>
+                <th>Supérieur hiérarchique</th>
                 <th>Pays / Région</th>
-                <th>Délégué Superviseur</th>
                 <th>Statut</th>
                 <th style="text-align: right;">Actions</th>
             </tr>
@@ -416,8 +455,17 @@
             <tr>
                 <td class="font-bold">{{ a.utilisateur ? a.utilisateur.nomComplet : '-' }}</td>
                 <td>{{ a.utilisateur ? a.utilisateur.username : '-' }}</td>
-                <td>{{ a.pays ? a.pays.nom : '' }} ({{ a.region ? a.region.nom : '' }})</td>
-                <td>{{ a.delegue and a.delegue.utilisateur ? a.delegue.utilisateur.nomComplet : 'Direct' }}</td>
+                <td><span class="badge {{ a.typeAgent in ['ASM', 'SUPERVISEUR'] ? 'badge-gold' : 'badge-info' }}">{{ a.typeAgentLibelle }}</span></td>
+                <td>
+                    {% if a.superviseur and a.superviseur.utilisateur %}
+                        {{ a.superviseur.utilisateur.nomComplet }} <span style="font-size: 11px; color: var(--text-muted);">({{ a.superviseur.typeAgent }})</span>
+                    {% elseif a.typeAgent == 'ASM' %}
+                        <span style="color: var(--text-muted);">— (sommet du réseau)</span>
+                    {% else %}
+                        <span class="badge badge-warning" title="Sans supérieur, ses demandes de prélèvement ne peuvent être validées que par un ASM ou un administrateur">Non rattaché</span>
+                    {% endif %}
+                </td>
+                <td>{{ a.pays ? a.pays.nom : '' }}{% if a.region %} ({{ a.region.nom }}){% endif %}</td>
                 <td>
                     {% if a.actif %}
                         <span class="badge badge-success">Actif</span>
@@ -430,10 +478,47 @@
                     <button onclick="openModal('modalDeleteAgent{{ a.id }}')" class="btn btn-danger btn-sm" title="Suppression logique"><i class="fa-solid fa-user-slash"></i></button>
                 </td>
             </tr>
+            {% else %}
+            <tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 32px;">Aucun agent commercial.</td></tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
+
+{# Champs communs : fonction, supérieur (filtré selon la fonction), région #}
+{% macro profilAgent(agents, regions, typesAgent, agent = null) %}
+    {% set prefixe = agent ? 'edit' ~ agent.id : 'add' %}
+    <div class="form-row">
+        <div class="form-group">
+            <label class="form-label">Fonction *</label>
+            <select name="typeAgent" class="form-select" required data-agent-type="{{ prefixe }}" onchange="filtrerSuperieurs('{{ prefixe }}')">
+                {% if not agent %}<option value="">-- Choisir --</option>{% endif %}
+                {% for t in typesAgent %}
+                    <option value="{{ t }}" {% if agent and agent.typeAgent == t %}selected{% endif %}>{{ {ASM: 'ASM (Area Sales Manager)', SUPERVISEUR: 'Superviseur des Ventes', DR: 'DR (Distribution Representative)', CYCLO: 'Cyclo (Vendeur Ambulant)'}[t] }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Supérieur hiérarchique</label>
+            <select name="superviseur_id" class="form-select" data-agent-sup="{{ prefixe }}">
+                <option value="">-- Aucun --</option>
+                {% for s in agents|filter(s => s.actif and s.typeAgent != 'CYCLO' and (not agent or s.id != agent.id)) %}
+                    <option value="{{ s.id }}" data-type="{{ s.typeAgent }}" {% if agent and agent.superviseur and agent.superviseur.id == s.id %}selected{% endif %}>{{ s.utilisateur.nomComplet }} — {{ s.typeAgent }}</option>
+                {% endfor %}
+            </select>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;" data-agent-aide="{{ prefixe }}"></div>
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="form-label">Région</label>
+        <select name="region_id" class="form-select">
+            <option value="">-- Non précisée --</option>
+            {% for r in regions %}
+                <option value="{{ r.id }}" {% if agent and agent.region and agent.region.id == r.id %}selected{% endif %}>{{ r.nom }}</option>
+            {% endfor %}
+        </select>
+    </div>
+{% endmacro %}
 
 <!-- Agents Modals (Rendered Outside Table) -->
 {% for a in agents %}
@@ -450,15 +535,14 @@
                     <label class="form-label">Compte Utilisateur</label>
                     <input type="text" class="form-control" value="{{ a.utilisateur ? a.utilisateur.nomComplet ~ ' (' ~ a.utilisateur.username ~ ')' : '' }}" disabled>
                 </div>
+                {{ _self.profilAgent(agents, regions, typesAgent, a) }}
                 <div class="form-row">
                     <div class="form-group">
-                        <label class="form-label">Délégué Superviseur</label>
+                        <label class="form-label">Délégué</label>
                         <select name="delegue_id" class="form-select">
-                            <option value="">-- Aucun (Direct) --</option>
+                            <option value="">-- Aucun --</option>
                             {% for del in delegues %}
-                                <option value="{{ del.id }}" {% if a.delegue and a.delegue.id == del.id %}selected{% endif %}>
-                                    {{ del.utilisateur ? del.utilisateur.nomComplet : 'Délégué #' ~ del.id }}
-                                </option>
+                                <option value="{{ del.id }}" {% if a.delegue and a.delegue.id == del.id %}selected{% endif %}>{{ del.utilisateur ? del.utilisateur.nomComplet : 'Délégué #' ~ del.id }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -522,41 +606,54 @@
         <form method="post" action="{{ path('app_agent_nouveau') }}">
             {{ include('_csrf.html.twig') }}
             <div class="modal-body">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label">Nom *</label>
-                        <input type="text" name="nom" class="form-control" placeholder="ex: ILUNGA" required>
+                <div class="form-group">
+                    <label class="form-label">Compte utilisateur</label>
+                    <select name="utilisateur_id" class="form-select" onchange="document.getElementById('nouveauCompteAgent').style.display = this.value ? 'none' : 'block'; document.querySelectorAll('#nouveauCompteAgent [data-requis]').forEach(function(i) { i.required = !this.value; }, this);">
+                        <option value="">Créer un nouveau compte</option>
+                        {% for u in comptesSansProfil %}
+                            <option value="{{ u.id }}">{{ u.nomComplet }} ({{ u.username }})</option>
+                        {% endfor %}
+                    </select>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Comptes actifs n'ayant pas encore de profil d'agent. Le rôle « Agent commercial » est ajouté si le compte n'a aucun rôle commercial.</div>
+                </div>
+                <div id="nouveauCompteAgent">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Nom *</label>
+                            <input type="text" name="nom" class="form-control" placeholder="ex: ILUNGA" required data-requis>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Prénom</label>
+                            <input type="text" name="prenom" class="form-control" placeholder="ex: Patrick">
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Prénom</label>
-                        <input type="text" name="prenom" class="form-control" placeholder="ex: Patrick">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Nom d'utilisateur *</label>
+                            <input type="text" name="username" class="form-control" placeholder="ex: pilunga" required data-requis>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Mot de passe *</label>
+                            <input type="password" name="password" class="form-control" placeholder="8 caractères minimum" minlength="8" autocomplete="new-password" required data-requis>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Email</label>
+                            <input type="email" name="email" class="form-control" placeholder="patrick@codis.cd">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Téléphone</label>
+                            <input type="text" name="telephone" class="form-control" placeholder="+243 810 000 000">
+                        </div>
                     </div>
                 </div>
+                {{ _self.profilAgent(agents, regions, typesAgent) }}
                 <div class="form-row">
                     <div class="form-group">
-                        <label class="form-label">Nom d'utilisateur *</label>
-                        <input type="text" name="username" class="form-control" placeholder="ex: pilunga" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Mot de Passe par défaut</label>
-                        <input type="password" name="password" class="form-control" value="agent123">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label">Email</label>
-                        <input type="email" name="email" class="form-control" placeholder="patrick@codis.cd">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Téléphone</label>
-                        <input type="text" name="telephone" class="form-control" placeholder="+243 810 000 000">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label">Délégué Superviseur</label>
+                        <label class="form-label">Délégué</label>
                         <select name="delegue_id" class="form-select">
-                            <option value="">-- Aucun (Direct) --</option>
+                            <option value="">-- Aucun --</option>
                             {% for del in delegues %}
                                 <option value="{{ del.id }}">{{ del.utilisateur ? del.utilisateur.nomComplet : 'Délégué #' ~ del.id }}</option>
                             {% endfor %}
@@ -579,5 +676,23 @@
         </form>
     </div>
 </div>
+
+<script>
+// Le supérieur proposé dépend de la fonction : DR → Superviseur, Superviseur → ASM, Cyclo → DR, ASM → aucun
+var typeSuperieur = {SUPERVISEUR: 'ASM', DR: 'SUPERVISEUR', CYCLO: 'DR'};
+function filtrerSuperieurs(prefixe) {
+    var type = document.querySelector('[data-agent-type="' + prefixe + '"]').value;
+    var select = document.querySelector('[data-agent-sup="' + prefixe + '"]');
+    var aide = document.querySelector('[data-agent-aide="' + prefixe + '"]');
+    var attendu = typeSuperieur[type] || null;
+    select.querySelectorAll('option[data-type]').forEach(function(o) {
+        o.hidden = o.dataset.type !== attendu;
+        if (o.hidden && o.selected) { select.value = ''; }
+    });
+    select.disabled = !attendu;
+    aide.textContent = attendu ? 'Un ' + type + ' est rattaché à un ' + attendu + '.' : (type === 'ASM' ? 'Un ASM est au sommet du réseau commercial.' : '');
+}
+document.querySelectorAll('[data-agent-type]').forEach(function(s) { filtrerSuperieurs(s.dataset.agentType); });
+</script>
 {% endif %}
 {% endblock %}

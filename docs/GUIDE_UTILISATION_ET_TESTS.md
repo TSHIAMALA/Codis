@@ -20,12 +20,12 @@ Ce document constitue le guide de prise en main et de test pas à pas de l'ensem
 | **Administrateur pays** (`ADMIN_PAYS`) | Tout sauf Audit ; grille tarifaire, utilisateurs, validations N1/N2 des consignations |
 | **Délégué commercial** (`DELEGUE`) | Réseau commercial, commandes (validation, annulation), consignations |
 | **Agent commercial** (`AGENT_COMMERCIAL`) | Commandes (création), consignations (demande), catalogue, stocks (lecture) |
-| **Gestionnaire dépôt** (`GESTIONNAIRE_DEPOT`) | Livraisons, clôture des consignations, catalogue, stocks |
+| **Gestionnaire dépôt** (`GESTIONNAIRE_DEPOT`) | Livraisons, clôture des consignations, transferts (expédition et réception), catalogue, stocks |
 | **Caissier** (`CAISSIER`) | Paiements & crédits, catalogue, stocks |
-| **Responsable usine** (`RESPONSABLE_USINE`) | Production, catalogue, stocks |
+| **Responsable usine** (`RESPONSABLE_USINE`) | Production, transferts (expédition depuis l'usine), catalogue, stocks |
 | **Utilisateur grossiste** (`GROSSISTE_USER`) | Pas d'accès à l'interface web (application mobile uniquement) |
 
-**Consignations DR** : le niveau 1 est validé par le Superviseur du DR (ou un ASM), le niveau 2 par un ASM *différent* du valideur N1. Les fonctions ASM / Superviseur / DR sont définies sur la fiche Agent (*Réseau commercial ➔ Agents*).
+**Consignations DR** : le niveau 1 est validé par le Superviseur du DR (ou un ASM), le niveau 2 par un ASM *différent* du valideur N1. Les fonctions (ASM, Superviseur, DR, Cyclo) et le supérieur hiérarchique se définissent sur la fiche Agent (*Réseau commercial ➔ Agents*) : un DR est rattaché à un Superviseur, un Superviseur à un ASM, un Cyclo à un DR.
 
 **Prix** : le prix de chaque ligne de commande est toujours calculé côté serveur à partir de la grille tarifaire (zone, puis région, puis national). Une commande dont un produit n'a pas de tarif actif est refusée.
 

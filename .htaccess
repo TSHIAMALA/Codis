@@ -1,0 +1,4 @@
+# Le projet est sous la racine web de WAMP : sans cette règle, Apache servirait .env.local (secrets),
+# config/jwt/private.pem, var/log, le code source... Seul le dossier public/ est accessible
+# (public/.htaccess y rétablit l'accès). Sur un serveur dont la racine web est public/, ce fichier est sans effet.
+Require all denied

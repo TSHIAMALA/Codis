@@ -33,6 +33,8 @@ Le premier compte administrateur se crée en base, ou en chargeant les données 
 
 ## Mise en production
 
+Le fichier `.htaccess` à la racine du projet ferme l'accès web à tout ce qui n'est pas dans `public/` (`.env.local`, clés JWT, journaux, code). Il ne doit jamais être supprimé tant que le projet est placé sous la racine web d'Apache (cas de WAMP).
+
 ```bash
 composer install --no-dev --optimize-autoloader
 php bin/console doctrine:migrations:migrate --no-interaction   # après une sauvegarde de la base

@@ -192,6 +192,7 @@ class ConsignationController extends AbstractController
             $quantites[$ligne->getId()] = [
                 'vendue' => (float) $request->request->get('quantiteVendue_' . $ligne->getId(), '0'),
                 'retournee' => (float) $request->request->get('quantiteRetournee_' . $ligne->getId(), '0'),
+                'perdue' => (float) $request->request->get('quantitePerdue_' . $ligne->getId(), '0'),
             ];
         }
         $cash = (float) $request->request->get('cashJustifie', '0');

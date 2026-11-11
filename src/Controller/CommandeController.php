@@ -138,8 +138,8 @@ class CommandeController extends AbstractController
             $ligne->setProduit($produit);
             $ligne->setConditionnement($conditionnement);
             $ligne->setQuantite((string) $qte);
-            $ligne->setPrixUnitaire((string) $prixU);
-            $ligne->setMontant((string) $montantLigne);
+            $ligne->setPrixUnitaire(number_format($prixU, 2, '.', ''));
+            $ligne->setMontant(number_format($montantLigne, 2, '.', ''));
 
             $em->persist($ligne);
             $montantTotal += $montantLigne;
@@ -155,7 +155,7 @@ class CommandeController extends AbstractController
             return $this->redirectToRoute('app_commande_index');
         }
 
-        $commande->setMontantTotal((string) $montantTotal);
+        $commande->setMontantTotal(number_format($montantTotal, 2, '.', ''));
 
         $em->persist($commande);
         $em->flush();

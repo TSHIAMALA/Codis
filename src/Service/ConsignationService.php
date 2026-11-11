@@ -22,6 +22,7 @@ class ConsignationService
     public const REF_PRELEVEMENT = 'CONSIGNATION_DR';
     public const REF_RETOUR = 'RETOUR_INVENDU_DR';
     public const REF_VENTE = 'VENTE_TOURNEE_DR';
+    public const REF_PERTE = 'PERTE_TOURNEE_DR';
     private const EPSILON = 0.0005;
 
     public function __construct(
@@ -100,11 +101,11 @@ class ConsignationService
     }
 
     /**
-     * Clôture de journée : chaque ligne doit être justifiée (vendu + retourné = confié).
-     * Les invendus retournent au dépôt, les ventes sortent du stock DR. Un écart entre le cash
-     * déclaré et la valeur des ventes doit être justifié.
+     * Clôture de journée : chaque ligne doit être justifiée (vendu + retourné + perdu = confié).
+     * Les invendus retournent au dépôt, les ventes et les pertes sortent du stock DR. Un écart entre le cash
+     * déclaré et la valeur des ventes, comme toute perte, doit être justifié.
      *
-     * @param array<int, array{vendue: float, retournee: float}> $quantites par id de ligne
+     * @param array<int, array{vendue: float, retournee: float, perdue?: float}> $quantites par id de ligne
      * @return array{attendu: float|null, ecart: float|null}
      * @throws OperationImpossibleException
      */
@@ -120,16 +121,19 @@ class ConsignationService
         $prix = $this->prixAttendus($c);
         $attendu = 0.0;
         $tousPrixConnus = true;
+        $totalPertes = 0.0;
         foreach ($c->getLignes() as $ligne) {
             $q = $quantites[$ligne->getId()] ?? null;
+            $perdue = (float) ($q['perdue'] ?? 0);
             $confiee = (float) $ligne->getQuantiteAccordee();
-            if ($q === null || $q['vendue'] < 0 || $q['retournee'] < 0 || abs($q['vendue'] + $q['retournee'] - $confiee) > self::EPSILON) {
+            if ($q === null || $q['vendue'] < 0 || $q['retournee'] < 0 || $perdue < 0 || abs($q['vendue'] + $q['retournee'] + $perdue - $confiee) > self::EPSILON) {
                 throw new OperationImpossibleException(sprintf(
-                    'Clôture refusée pour %s : vendu (%s) + invendus (%s) doit être égal à la quantité confiée (%s).',
+                    'Clôture refusée pour %s : vendu (%s) + invendus (%s) + pertes (%s) doit être égal à la quantité confiée (%s).',
                     $ligne->getProduit()->getNom(),
-                    $q['vendue'] ?? 0, $q['retournee'] ?? 0, $confiee
+                    $q['vendue'] ?? 0, $q['retournee'] ?? 0, $perdue, $confiee
                 ));
             }
+            $totalPertes += $perdue;
             if ($prix[$ligne->getId()] === null) {
                 $tousPrixConnus = false;
             } else {
@@ -140,6 +144,9 @@ class ConsignationService
         $attendu = $tousPrixConnus ? round($attendu, 2) : null;
         $ecart = $attendu !== null ? round($cash - $attendu, 2) : null;
         $justification = trim((string) $justification);
+        if ($totalPertes > 0 && $justification === '') {
+            throw new OperationImpossibleException('Des pertes ou de la casse sont déclarées : une justification est obligatoire (circonstances, constat).');
+        }
         if ($ecart !== null && abs($ecart) >= 0.01 && $justification === '') {
             throw new OperationImpossibleException(sprintf(
                 'Écart de caisse de %s $ (cash %s $ / ventes attendues %s $) : une justification est obligatoire.',
@@ -152,12 +159,14 @@ class ConsignationService
             throw new OperationImpossibleException('Aucun emplacement de stock actif pour le dépôt ' . ($c->getDepot()?->getNom() ?? '(non renseigné)') . '.');
         }
 
-        $this->em->wrapInTransaction(function () use ($c, $cash, $quantites, $justification, $attendu, $ecart, $user, $depot) {
+        $this->em->wrapInTransaction(function () use ($c, $cash, $quantites, $justification, $attendu, $ecart, $totalPertes, $user, $depot) {
             $empDr = $this->stockService->getOrCreateEmplacementDr($c->getDr());
             foreach ($c->getLignes() as $ligne) {
                 $q = $quantites[$ligne->getId()];
                 $ligne->setQuantiteVendue(number_format($q['vendue'], 3, '.', ''));
                 $ligne->setQuantiteRetournee(number_format($q['retournee'], 3, '.', ''));
+                $perdue = (float) ($q['perdue'] ?? 0);
+                $ligne->setQuantitePerdue(number_format($perdue, 3, '.', ''));
 
                 if ($q['retournee'] > 0) {
                     $this->stockService->sortir('RETOUR', $ligne->getProduit(), $ligne->getConditionnement(), $q['retournee'], $empDr, $depot,
@@ -167,16 +176,27 @@ class ConsignationService
                     $this->stockService->sortir('VENTE', $ligne->getProduit(), $ligne->getConditionnement(), $q['vendue'], $empDr, null,
                         self::REF_VENTE, $c->getId(), $user, 'Ventes tournée DR ' . $c->getNumero());
                 }
+                if ($perdue > 0) {
+                    $this->stockService->sortir('AJUSTEMENT', $ligne->getProduit(), $ligne->getConditionnement(), $perdue, $empDr, null,
+                        self::REF_PERTE, $c->getId(), $user, 'Pertes / casse tournée DR ' . $c->getNumero() . ' : ' . $justification);
+                }
             }
 
             $c->setCashJustifie(number_format($cash, 2, '.', ''));
             if ($justification !== '') {
-                $c->setObservation(trim(($c->getObservation() ? $c->getObservation() . "\n" : '') . 'Écart de caisse ' . number_format((float) $ecart, 2, ',', ' ') . ' $ : ' . $justification));
+                $constats = [];
+                if ($ecart !== null && abs($ecart) >= 0.01) {
+                    $constats[] = 'écart de caisse ' . number_format($ecart, 2, ',', ' ') . ' $';
+                }
+                if ($totalPertes > 0) {
+                    $constats[] = 'pertes ' . rtrim(rtrim(number_format($totalPertes, 3, ',', ' '), '0'), ',');
+                }
+                $c->setObservation(trim(($c->getObservation() ? $c->getObservation() . "\n" : '') . 'Clôture (' . (implode(', ', $constats) ?: 'note') . ') : ' . $justification));
             }
             $this->consignationWorkflow->apply($c, 'cloturer');
             $this->em->flush();
             $this->auditService->log('demande_consignation', 'CLOSE', $c->getId(), null, [
-                'numero' => $c->getNumero(), 'cash' => $cash, 'attendu' => $attendu, 'ecart' => $ecart,
+                'numero' => $c->getNumero(), 'cash' => $cash, 'attendu' => $attendu, 'ecart' => $ecart, 'pertes' => $totalPertes,
             ]);
         });
 

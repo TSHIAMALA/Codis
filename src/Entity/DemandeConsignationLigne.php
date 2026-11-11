@@ -37,6 +37,10 @@ class DemandeConsignationLigne
     #[ORM\Column(type: 'decimal', precision: 15, scale: 3, options: ['default' => '0.000'])]
     private ?string $quantiteRetournee = '0.000';
 
+    /** Cartons perdus, cassés ou volés pendant la tournée (déclarés et justifiés à la clôture). */
+    #[ORM\Column(type: 'decimal', precision: 15, scale: 3, options: ['default' => '0.000'])]
+    private ?string $quantitePerdue = '0.000';
+
     public function getId(): ?int { return $this->id; }
     public function getDemande(): ?DemandeConsignation { return $this->demande; }
     public function setDemande(?DemandeConsignation $d): self { $this->demande = $d; return $this; }
@@ -52,4 +56,6 @@ class DemandeConsignationLigne
     public function setQuantiteVendue(string $q): self { $this->quantiteVendue = $q; return $this; }
     public function getQuantiteRetournee(): ?string { return $this->quantiteRetournee; }
     public function setQuantiteRetournee(string $q): self { $this->quantiteRetournee = $q; return $this; }
+    public function getQuantitePerdue(): ?string { return $this->quantitePerdue; }
+    public function setQuantitePerdue(string $q): self { $this->quantitePerdue = $q; return $this; }
 }

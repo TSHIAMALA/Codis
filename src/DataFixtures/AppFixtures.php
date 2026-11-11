@@ -29,6 +29,7 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
  * Stock initial au dépôt « DEP-TEST » :
  *  - Produit A, Carton : 30 (lot ancien, péremption J+30) + 100 (lot récent, J+365) = 130
  *  - Produit B, Carton : 20 (sans tarif : toute commande de B doit être refusée)
+ * Stock à l'usine « Usine Test » : Produit A, Carton : 200 (lot récent)
  * Tarifs du Produit A, Carton : 450 $ (grossiste, région Kinshasa), 500 $ (grossiste, national), 480 $ (détaillant, Kinshasa)
  */
 class AppFixtures extends Fixture
@@ -42,6 +43,7 @@ class AppFixtures extends Fixture
     public const ASM = 'test_asm';
     public const GESTIONNAIRE = 'test_depot';
     public const CAISSIER = 'test_caisse';
+    public const USINE = 'test_usine';
     public const PARTENAIRE = 'test_partenaire';
     public const EN_ATTENTE = 'test_en_attente';
 
@@ -97,6 +99,9 @@ class AppFixtures extends Fixture
                 ->setQuantiteDisponible($qte)->setQuantiteReservee('0')->setQuantiteTransit('0');
             $om->persist($stock);
         }
+        // Stock à l'usine, à transférer vers le dépôt
+        $om->persist((new Stock())->setEmplacement($empUsine)->setProduit($produitA)->setLot($lotRecent)->setConditionnement($cartonA)
+            ->setQuantiteDisponible('200')->setQuantiteReservee('0')->setQuantiteTransit('0'));
 
         foreach ([[$kin, 'GROSSISTE', '450'], [null, 'GROSSISTE', '500'], [$kin, 'DETAILLANT', '480']] as [$region, $type, $prix]) {
             $om->persist((new Tarif())->setPays($pays)->setRegion($region)->setProduit($produitA)->setConditionnement($cartonA)->setTypeClient($type)->setPrix($prix)->setActif(true));
@@ -105,7 +110,7 @@ class AppFixtures extends Fixture
         $users = [];
         foreach ([
             self::ADMIN => 'SUPER_ADMIN', self::DELEGUE => 'DELEGUE', self::DR => 'AGENT_COMMERCIAL', self::SUPERVISEUR => 'AGENT_COMMERCIAL',
-            self::ASM => 'AGENT_COMMERCIAL', self::GESTIONNAIRE => 'GESTIONNAIRE_DEPOT', self::CAISSIER => 'CAISSIER',
+            self::ASM => 'AGENT_COMMERCIAL', self::GESTIONNAIRE => 'GESTIONNAIRE_DEPOT', self::CAISSIER => 'CAISSIER', self::USINE => 'RESPONSABLE_USINE',
             self::PARTENAIRE => 'GROSSISTE_USER', self::EN_ATTENTE => null,
         ] as $username => $role) {
             $u = (new Utilisateur())->setNom(strtoupper($username))->setPrenom('Test')->setUsername($username)->setEmail($username . '@test.codis')->setPays($pays)->setActif($role !== null);

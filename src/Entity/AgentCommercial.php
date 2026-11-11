@@ -61,6 +61,20 @@ class AgentCommercial
     public function isActif(): bool { return $this->actif; }
     public function setActif(bool $a): self { $this->actif = $a; return $this; }
 
+    /** Fonctions commerciales, du haut au bas de la hiérarchie directe. */
+    public const TYPES = ['ASM', 'SUPERVISEUR', 'DR', 'CYCLO'];
+
+    /** Fonction attendue du supérieur direct (null : l'ASM n'a pas de supérieur dans le réseau). */
+    public static function typeSuperieur(string $typeAgent): ?string
+    {
+        return match ($typeAgent) {
+            'SUPERVISEUR' => 'ASM',
+            'DR' => 'SUPERVISEUR',
+            'CYCLO' => 'DR',
+            default => null,
+        };
+    }
+
     public function getTypeAgentLibelle(): string
     {
         return match($this->typeAgent) {

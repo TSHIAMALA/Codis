@@ -53,3 +53,14 @@ framework:
             transitions:
                 valider: { from: BROUILLON, to: VALIDEE }
                 annuler: { from: BROUILLON, to: ANNULEE }
+
+        transfert:
+            type: state_machine
+            audit_trail: { enabled: true }
+            marking_store: { type: method, property: statut }
+            supports: [App\Entity\TransfertStock]
+            initial_marking: EN_TRANSIT
+            places: [BROUILLON, VALIDE, PREPARE, EXPEDIE, EN_TRANSIT, RECEPTIONNE, ANNULE]
+            transitions:
+                receptionner: { from: [EN_TRANSIT, EXPEDIE], to: RECEPTIONNE }
+                annuler: { from: [BROUILLON, VALIDE, PREPARE, EXPEDIE, EN_TRANSIT], to: ANNULE }

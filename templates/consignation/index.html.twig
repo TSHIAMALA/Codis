@@ -220,8 +220,12 @@
                             <input type="number" step="0.001" min="0" name="quantiteVendue_{{ l.id }}" class="form-control input-vendue" value="{{ l.quantiteAccordee }}" oninput="majCloture({{ c.id }}, this, 'vendue')">
                         </div>
                         <div class="form-group" style="margin-bottom: 0;">
-                            <label class="form-label">Invendus à réintégrer au dépôt</label>
-                            <input type="number" step="0.001" min="0" name="quantiteRetournee_{{ l.id }}" class="form-control input-retour" value="0" oninput="majCloture({{ c.id }}, this, 'retour')">
+                            <label class="form-label">Pertes / casse</label>
+                            <input type="number" step="0.001" min="0" name="quantitePerdue_{{ l.id }}" class="form-control input-perte" value="0" oninput="majCloture({{ c.id }}, this, 'perte')">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">Invendus rendus au dépôt</label>
+                            <input type="number" step="0.001" min="0" name="quantiteRetournee_{{ l.id }}" class="form-control input-retour" value="0" readonly tabindex="-1" title="Calculé : confié − vendu − pertes" style="background: var(--bg-card-subtle);">
                         </div>
                     </div>
                 </div>
@@ -233,8 +237,8 @@
                 </div>
                 <div class="resume-cloture" style="font-size: 12px; padding: 10px 12px; border-radius: 8px; background: rgba(212, 160, 23, 0.08); border: 1px solid rgba(212, 160, 23, 0.2);"></div>
                 <div class="form-group bloc-justification" style="margin-top: 12px; display: none;">
-                    <label class="form-label">Justification de l'écart de caisse *</label>
-                    <textarea name="justificationEcart" class="form-control" rows="2" placeholder="ex: remise accordée au grossiste X, 2 cartons offerts en dégustation..."></textarea>
+                    <label class="form-label">Justification (écart de caisse, pertes ou casse) *</label>
+                    <textarea name="justificationEcart" class="form-control" rows="2" placeholder="ex: remise accordée au grossiste X ; 2 cartons abîmés par la pluie, constat signé"></textarea>
                 </div>
             </div>
             <div class="modal-footer">
@@ -305,13 +309,19 @@ function majDispoConsignation() {
 // Clôture : vendu + invendus = confié, et contrôle du cash attendu
 function majCloture(id, champ, sens) {
     var modal = document.getElementById('modalCloturerConsignation' + id);
-    if (champ) {
-        var ligne = champ.closest('.ligne-cloture');
-        var confiee = parseFloat(ligne.dataset.confiee) || 0;
-        var v = Math.min(Math.max(parseFloat(champ.value) || 0, 0), confiee);
-        var autre = ligne.querySelector(sens === 'vendue' ? '.input-retour' : '.input-vendue');
-        autre.value = +(confiee - v).toFixed(3);
-    }
+    var pertes = 0;
+    modal.querySelectorAll('.ligne-cloture').forEach(function(l) {
+        // Invendus rendus = confié − vendu − pertes (jamais négatif)
+        var confiee = parseFloat(l.dataset.confiee) || 0;
+        var vendue = Math.max(parseFloat(l.querySelector('.input-vendue').value) || 0, 0);
+        var perte = Math.max(parseFloat(l.querySelector('.input-perte').value) || 0, 0);
+        if (vendue + perte > confiee) {
+            if (sens === 'perte') { perte = confiee - vendue; l.querySelector('.input-perte').value = +perte.toFixed(3); }
+            else { vendue = confiee - perte; l.querySelector('.input-vendue').value = +vendue.toFixed(3); }
+        }
+        l.querySelector('.input-retour').value = +(confiee - vendue - perte).toFixed(3);
+        pertes += perte;
+    });
     var attendu = 0, prixConnus = true;
     modal.querySelectorAll('.ligne-cloture').forEach(function(l) {
         if (l.dataset.prix === '') { prixConnus = false; return; }
@@ -322,7 +332,8 @@ function majCloture(id, champ, sens) {
     var bloc = modal.querySelector('.bloc-justification');
     if (!prixConnus) {
         resume.innerHTML = '<i class="fa-solid fa-circle-info"></i> Tarif non défini pour un produit : le cash attendu ne peut pas être calculé.';
-        bloc.style.display = 'none';
+        bloc.style.display = pertes > 0 ? 'block' : 'none';
+        bloc.querySelector('textarea').required = pertes > 0;
         return;
     }
     var html = '<i class="fa-solid fa-calculator"></i> Valeur des ventes attendue : <strong>' + fmt(attendu) + ' $</strong>';
@@ -332,8 +343,11 @@ function majCloture(id, champ, sens) {
     } else if (cashInput.value !== '') {
         html += ' · <span style="color: #10b981; font-weight: 700;"><i class="fa-solid fa-check"></i> Caisse équilibrée</span>';
     }
+    if (pertes > 0) {
+        html += ' · <span style="color: #f59e0b; font-weight: 700;">Pertes déclarées : ' + pertes.toLocaleString('fr-FR') + '</span>';
+    }
     resume.innerHTML = html;
-    var besoin = cashInput.value !== '' && Math.abs(ecart) >= 0.01;
+    var besoin = (cashInput.value !== '' && Math.abs(ecart) >= 0.01) || pertes > 0;
     bloc.style.display = besoin ? 'block' : 'none';
     bloc.querySelector('textarea').required = besoin;
 }

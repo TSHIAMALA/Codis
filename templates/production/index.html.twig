@@ -92,7 +92,7 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label">Produit à Fabriquer *</label>
-                        <select name="produit_id" class="form-select" required>
+                        <select name="produit_id" id="prodProduit" class="form-select" required onchange="filtrerCondProduction()">
                             <option value="">-- Sélectionner le produit --</option>
                             {% for p in produits %}
                                 <option value="{{ p.id }}">{{ p.nom }} (Code: {{ p.code }})</option>
@@ -100,9 +100,18 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Quantité *</label>
-                        <input type="number" step="0.001" name="quantite" class="form-control" placeholder="ex: 5000" required>
+                        <label class="form-label">Conditionnement *</label>
+                        <select name="conditionnement_id" id="prodCond" class="form-select" required>
+                            <option value="">-- Choisir le produit d'abord --</option>
+                            {% for c in conditionnements %}
+                                <option value="{{ c.id }}" data-produit="{{ c.produit ? c.produit.id : '' }}" hidden>{{ c.libelle }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Quantité produite *</label>
+                    <input type="number" step="0.001" min="0.001" name="quantite" class="form-control" placeholder="ex: 500 (dans le conditionnement choisi)" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Date de Production</label>
@@ -179,4 +188,18 @@
 </div>
 {% endif %}
 {% endfor %}
+<script>
+function filtrerCondProduction() {
+    var produit = document.getElementById('prodProduit').value;
+    var select = document.getElementById('prodCond');
+    var visibles = [];
+    select.querySelectorAll('option[data-produit]').forEach(function(o) {
+        o.hidden = o.dataset.produit !== produit;
+        if (!o.hidden) visibles.push(o);
+    });
+    select.options[0].textContent = produit ? '-- Unité --' : "-- Choisir le produit d'abord --";
+    // Le conditionnement le plus grand (carton) est proposé par défaut
+    select.value = visibles.length ? visibles[0].value : '';
+}
+</script>
 {% endblock %}

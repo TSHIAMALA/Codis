@@ -1,5 +1,8 @@
 DirectoryIndex index.php
 
+# Seul dossier servi par Apache (la racine du projet est fermée par ../.htaccess)
+Require all granted
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
 

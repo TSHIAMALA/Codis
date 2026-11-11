@@ -99,7 +99,9 @@ Commande Client ➔ RÈGLEMENT CAISSE PRÉALABLE ➔ Bon de Livraison (BL) ➔ E
 | **Validation Ordre Fabrication** | `VALIDEE` | 🟢 **`+ Stock Usine`** |
 | **Validation Prélèvement DR (ASM)** | `VALIDEE_ASM` | 🔁 **`Stock Dépôt ➔ Stock DR`** (emplacement « Stock DR — nom », mêmes lots) |
 | **Rejet d'une demande DR** | `REJETEE` | ⚪ Aucun impact (motif obligatoire) |
-| **Clôture Journée DR** | `CLOTUREE` | 🔁 Invendus **`Stock DR ➔ Stock Dépôt`**, ventes 🔴 **`- Stock DR`** |
+| **Clôture Journée DR** | `CLOTUREE` | 🔁 Invendus **`Stock DR ➔ Stock Dépôt`**, ventes et pertes 🔴 **`- Stock DR`** (vendu + rendu + perdu = confié ; toute perte est justifiée) |
+| **Expédition d'un transfert** (usine ou dépôt ➔ dépôt) | `EN_TRANSIT` | 🔴 **`- Stock départ`** (lots les plus proches de la péremption d'abord) |
+| **Réception d'un transfert** | `RECEPTIONNE` | 🟢 **`+ Stock dépôt d'arrivée`** (mêmes lots) ; annulé en transit, le stock revient au départ |
 | **Commande Client** | `SOUMISE` | ⚪ Aucun impact |
 | **Validation Commande** | `VALIDEE` | ⚪ Génère le BL. Bloquée si la limite de crédit est dépassée (hors distributeurs agréés) |
 | **Règlement Caisse** | `VALIDE` | 🟡 Autorise l'expédition du BL d'un Distributeur Agréé |

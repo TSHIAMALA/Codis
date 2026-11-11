@@ -121,6 +121,10 @@ class ApiCommandesController extends AbstractController
         if (!empty($data['depot_id'])) {
             $c->setDepot($em->getRepository(Depot::class)->find($data['depot_id']));
         }
+        // L'application mobile n'envoie pas de dépôt : sans dépôt, le BL ne pourrait jamais être expédié
+        if (!$c->getDepot()) {
+            $c->setDepot($this->depotParDefaut($em, $agent));
+        }
         if (!$c->getGrossiste() && !$c->getDetailant()) {
             return new JsonResponse(['success' => false, 'error' => 'Client introuvable'], 422);
         }
@@ -149,8 +153,8 @@ class ApiCommandesController extends AbstractController
             $cl->setProduit($p);
             $cl->setConditionnement($cond);
             $cl->setQuantite((string) $qte);
-            $cl->setPrixUnitaire((string) $pu);
-            $cl->setMontant((string) $ligneMontant);
+            $cl->setPrixUnitaire(number_format($pu, 2, '.', ''));
+            $cl->setMontant(number_format($ligneMontant, 2, '.', ''));
             $c->getLignes()->add($cl);
             $em->persist($cl);
         }
@@ -162,7 +166,7 @@ class ApiCommandesController extends AbstractController
             return new JsonResponse(['success' => false, 'error' => 'Aucune ligne de commande valide'], 422);
         }
 
-        $c->setMontantTotal((string) $montantTotal);
+        $c->setMontantTotal(number_format($montantTotal, 2, '.', ''));
         $em->persist($c);
         $em->flush();
 
@@ -173,6 +177,21 @@ class ApiCommandesController extends AbstractController
             'montantTotal' => $montantTotal,
             'statut' => $c->getStatut(),
         ], 201);
+    }
+
+    /** Dépôt de la région de l'agent (le central en priorité), sinon le dépôt central. */
+    private function depotParDefaut(EntityManagerInterface $em, ?AgentCommercial $agent): ?Depot
+    {
+        $repo = $em->getRepository(Depot::class);
+        if ($agent?->getRegion()) {
+            $depots = $repo->findBy(['region' => $agent->getRegion(), 'actif' => true], ['id' => 'ASC']);
+            usort($depots, fn (Depot $a, Depot $b) => ($b->getTypeDepot() === 'CENTRAL') <=> ($a->getTypeDepot() === 'CENTRAL'));
+            if ($depots) {
+                return $depots[0];
+            }
+        }
+
+        return $repo->findOneBy(['typeDepot' => 'CENTRAL', 'actif' => true], ['id' => 'ASC']) ?? $repo->findOneBy(['actif' => true], ['id' => 'ASC']);
     }
 
     private function getAgentConnecte(EntityManagerInterface $em): ?AgentCommercial

@@ -54,8 +54,8 @@ class StockManagerServiceTest extends KernelTestCase
         // L'EntityManager est fermé après un rollback : on relit avec un gestionnaire neuf
         static::getContainer()->get('doctrine')->resetManager();
         $em = static::getContainer()->get('doctrine')->getManager();
-        $total = (float) $em->createQuery('SELECT SUM(s.quantiteDisponible) FROM App\Entity\Stock s WHERE s.produit = :p AND s.conditionnement = :c')
-            ->setParameter('p', $this->produit->getId())->setParameter('c', $this->carton->getId())->getSingleScalarResult();
+        $total = (float) $em->createQuery('SELECT SUM(s.quantiteDisponible) FROM App\Entity\Stock s WHERE s.emplacement = :e AND s.produit = :p AND s.conditionnement = :c')
+            ->setParameter('e', $this->depot->getId())->setParameter('p', $this->produit->getId())->setParameter('c', $this->carton->getId())->getSingleScalarResult();
         self::assertSame(130.0, $total);
     }
 
@@ -65,13 +65,14 @@ class StockManagerServiceTest extends KernelTestCase
 
         $this->em->wrapInTransaction(fn () => $this->stock->sortir('TRANSFERT', $this->produit, $this->carton, 40, $this->depot, $usine, 'TEST', 1));
         self::assertSame(90.0, $this->stock->getDisponible($this->depot, $this->produit, $this->carton));
-        self::assertSame(40.0, $this->stock->getDisponible($usine, $this->produit, $this->carton));
+        // L'usine détient déjà 200 cartons dans les données de test
+        self::assertSame(240.0, $this->stock->getDisponible($usine, $this->produit, $this->carton));
 
         $inverses = $this->em->wrapInTransaction(fn () => $this->stock->annulerMouvements('TEST', 1, 'RETOUR'));
 
         self::assertCount(2, $inverses);
         self::assertSame(130.0, $this->stock->getDisponible($this->depot, $this->produit, $this->carton));
-        self::assertSame(0.0, $this->stock->getDisponible($usine, $this->produit, $this->carton));
+        self::assertSame(200.0, $this->stock->getDisponible($usine, $this->produit, $this->carton));
         self::assertSame('TEST_ANNULATION', $inverses[0]->getReferenceType());
     }
 
