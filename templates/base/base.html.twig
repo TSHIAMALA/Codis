@@ -206,7 +206,7 @@
 			<!-- Administration -->
 			{% if is_granted('ROLE_ADMIN_PAYS') %}
 				{% set nbDemandes = demandes_acces_count() %}
-				<li class="nav-item has-submenu {% if route in ['app_utilisateur_index', 'app_audit_index'] or nbDemandes > 0 %}open{% endif %}">
+				<li class="nav-item has-submenu {% if route in ['app_utilisateur_index', 'app_role_index', 'app_audit_index'] or nbDemandes > 0 %}open{% endif %}">
 					<div class="nav-item-header" onclick="toggleSubmenu(this)">
 						<div class="header-left">
 							<i class="fa-solid fa-shield-halved icon-main"></i>
@@ -222,6 +222,12 @@
 								{% if nbDemandes > 0 %}
 									<span class="nav-count" title="{{ nbDemandes }} demande(s) d'accès en attente">{{ nbDemandes }}</span>
 								{% endif %}
+							</a>
+						</li>
+						<li class="submenu-item {% if route == 'app_role_index' %}active{% endif %}">
+							<a href="{{ path('app_role_index') }}">
+								<i class="fa-solid fa-id-badge"></i>
+								<span>Rôles & Permissions</span>
 							</a>
 						</li>
 						{% if is_granted('ROLE_SUPER_ADMIN') %}

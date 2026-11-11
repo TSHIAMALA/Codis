@@ -1,0 +1,140 @@
+{% extends 'base/base.html.twig' %}
+
+{% block page_title %}Rôles & Permissions{% endblock %}
+{% block page_subtitle %}Ce que chaque rôle permet de faire, et qui le porte{% endblock %}
+
+{% block body %}
+{% set peutRenommer = is_granted('ROLE_SUPER_ADMIN') %}
+
+<div class="card-table" style="margin-bottom: 24px;">
+    <div class="card-table-header">
+        <div class="card-table-title"><i class="fa-solid fa-id-badge"></i> Rôles du système</div>
+        <span class="badge badge-gold">{{ roles|length }} rôles</span>
+    </div>
+    <table class="custom-table">
+        <thead>
+            <tr>
+                <th>Rôle</th>
+                <th>Code</th>
+                <th>Accès</th>
+                <th>Utilisateurs</th>
+                {% if peutRenommer %}<th style="text-align: right;">Actions</th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in roles %}
+                {% set liste = porteurs[r.id] ?? [] %}
+                <tr>
+                    <td class="font-bold">{{ r.libelle }}</td>
+                    <td><code style="font-size: 12px; color: var(--text-muted);">{{ r.code }}</code></td>
+                    <td>
+                        {% if accesWeb[r.id] %}
+                            <span class="badge badge-info">Interface web</span>
+                        {% else %}
+                            <span class="badge badge-warning" title="Ce rôle n'ouvre aucun écran de l'interface web">Pas d'accès web</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="font-bold">{{ liste|length }}</span>
+                        {% if liste is not empty %}
+                            <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                                {% for u in liste|slice(0, 5) %}{{ u.nomComplet }}{% if not u.actif %} (inactif){% endif %}{{ not loop.last ? ', ' }}{% endfor %}{% if liste|length > 5 %} et {{ liste|length - 5 }} autre(s){% endif %}
+                            </div>
+                        {% endif %}
+                    </td>
+                    {% if peutRenommer %}
+                        <td style="text-align: right;">
+                            <button onclick="openModal('modalLibelleRole{{ r.id }}')" class="btn btn-outline btn-sm" title="Renommer le rôle"><i class="fa-solid fa-pen-to-square"></i></button>
+                        </td>
+                    {% endif %}
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <p style="font-size: 12px; color: var(--text-muted); padding: 12px 24px 16px;">
+        <i class="fa-solid fa-circle-info"></i>
+        Le rôle d'un utilisateur s'attribue dans <a href="{{ path('app_utilisateur_index') }}" class="text-gold">Utilisateurs & Accès</a>.
+        Les droits de chaque rôle sont fixés par l'application ; seul le libellé affiché peut être modifié.
+    </p>
+</div>
+
+<div class="card-table">
+    <div class="card-table-header">
+        <div class="card-table-title"><i class="fa-solid fa-table-cells"></i> Matrice des accès</div>
+        <div style="display: flex; gap: 8px; align-items: center; font-size: 12px; flex-wrap: wrap;">
+            <span class="badge badge-success"><i class="fa-solid fa-check"></i> Complet</span>
+            <span class="badge badge-gold"><i class="fa-solid fa-circle-half-stroke"></i> Partiel</span>
+            <span style="color: var(--text-muted);">— Aucun accès</span>
+        </div>
+    </div>
+    <div style="overflow-x: auto;">
+        <table class="custom-table matrice-acces">
+            <thead>
+                <tr>
+                    <th>Module</th>
+                    {% for r in roles %}
+                        <th style="text-align: center;">{{ r.libelle }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in modules %}
+                    <tr>
+                        <td class="font-bold" style="white-space: nowrap;">
+                            <i class="fa-solid {{ m.icone }}" style="color: var(--text-muted); width: 18px;"></i>
+                            {{ m.module }}{% for a in m.actions|filter(a => a.note is defined) %}<sup class="text-gold" title="{{ a.note }}">*</sup>{% endfor %}
+                        </td>
+                        {% for r in roles %}
+                            {% set d = droits[r.id][m.module] %}
+                            <td style="text-align: center; vertical-align: top;">
+                                {% if d.niveau == 'complet' %}
+                                    <span class="badge badge-success" title="{{ d.actions|join(', ') }}"><i class="fa-solid fa-check"></i></span>
+                                {% elseif d.niveau == 'partiel' %}
+                                    <span class="badge badge-gold"><i class="fa-solid fa-circle-half-stroke"></i></span>
+                                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.4;">{{ d.actions|join(' · ') }}</div>
+                                {% else %}
+                                    <span style="color: var(--text-muted);">—</span>
+                                {% endif %}
+                            </td>
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div style="font-size: 12px; color: var(--text-muted); padding: 12px 24px 16px; line-height: 1.6;">
+        {% for m in modules %}
+            {% for a in m.actions|filter(a => a.note is defined) %}
+                <div><span class="text-gold">*</span> <strong>{{ m.module }} — {{ a.libelle }}</strong> : {{ a.note }}</div>
+            {% endfor %}
+        {% endfor %}
+    </div>
+</div>
+
+{% if peutRenommer %}
+    {% for r in roles %}
+        <div id="modalLibelleRole{{ r.id }}" class="modal-backdrop">
+            <div class="modal-content" style="max-width: 450px;">
+                <div class="modal-header">
+                    <div class="modal-title"><i class="fa-solid fa-pen-to-square text-gold"></i> Renommer le rôle {{ r.code }}</div>
+                    <button onclick="closeModal('modalLibelleRole{{ r.id }}')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <form method="post" action="{{ path('app_role_libelle', {id: r.id}) }}">
+                    {{ include('_csrf.html.twig') }}
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label class="form-label">Libellé affiché *</label>
+                            <input type="text" name="libelle" class="form-control" value="{{ r.libelle }}" maxlength="100" required>
+                        </div>
+                        <p style="font-size: 12px; color: var(--text-muted);">Le libellé change partout dans l'application. Les droits du rôle restent les mêmes.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" onclick="closeModal('modalLibelleRole{{ r.id }}')" class="btn btn-outline">Annuler</button>
+                        <button type="submit" class="btn btn-gold"><i class="fa-solid fa-floppy-disk"></i> Enregistrer</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    {% endfor %}
+{% endif %}
+{% endblock %}
