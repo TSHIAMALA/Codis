@@ -25,6 +25,11 @@
 			(function() {
 				const savedTheme = localStorage.getItem('codis_theme') || 'light';
 				document.documentElement.setAttribute('data-theme', savedTheme);
+				try {
+					if (localStorage.getItem('codis_sidebar') === 'collapsed') {
+						document.documentElement.setAttribute('data-sidebar', 'collapsed');
+					}
+				} catch (e) {}
 			})();
 		</script>
 
@@ -33,7 +38,7 @@
 </head>
 <body>
 	<!-- Sidebar Navigation -->
-	<aside class="sidebar">
+	<aside class="sidebar" id="sidebar">
 		<div class="brand-header">
 			<div class="brand-logo">
 				<img src="{{ asset('images/icon.png') }}" alt="CODIS Logo">
@@ -242,15 +247,20 @@
 	<!-- Main Body Area -->
 	<main class="main-content">
 		<div class="topbar">
-			<div>
-				<h1 class="page-title">
-					{% block page_title %}Tableau de Bord
-					{% endblock %}
-				</h1>
-				<p class="page-subtitle">
-					{% block page_subtitle %}Supervision en temps réel de la distribution
-					{% endblock %}
-				</p>
+			<div class="topbar-title">
+				<button type="button" class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="Masquer le menu (Ctrl+B)" aria-label="Masquer le menu" aria-controls="sidebar" aria-expanded="true">
+					<i class="fa-solid fa-bars"></i>
+				</button>
+				<div>
+					<h1 class="page-title">
+						{% block page_title %}Tableau de Bord
+						{% endblock %}
+					</h1>
+					<p class="page-subtitle">
+						{% block page_subtitle %}Supervision en temps réel de la distribution
+						{% endblock %}
+					</p>
+				</div>
 			</div>
 			<div style="display: flex; gap: 12px; align-items: center;">
 				<!-- Sélecteur de Thème (Clair / Sombre) -->

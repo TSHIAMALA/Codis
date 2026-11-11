@@ -25,6 +25,47 @@ document.addEventListener('DOMContentLoaded', function() {
 	updateThemeSwitcherUI(currentTheme);
 });
 
+// Menu latéral masquable : l'état est mémorisé dans ce navigateur.
+function setSidebarCollapsed(collapsed) {
+	const root = document.documentElement;
+	if (collapsed)
+		root.setAttribute('data-sidebar', 'collapsed');
+	else
+		root.removeAttribute('data-sidebar');
+	try {
+		localStorage.setItem('codis_sidebar', collapsed ? 'collapsed' : 'expanded');
+	} catch (e) {}
+	updateSidebarToggleUI();
+}
+
+function toggleSidebar() {
+	setSidebarCollapsed(document.documentElement.getAttribute('data-sidebar') !== 'collapsed');
+}
+
+function updateSidebarToggleUI() {
+	const btn = document.getElementById('sidebarToggle');
+	if (!btn)
+		return;
+	const collapsed = document.documentElement.getAttribute('data-sidebar') === 'collapsed';
+	const label = collapsed ? 'Afficher le menu' : 'Masquer le menu';
+	btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+	btn.setAttribute('aria-label', label);
+	btn.title = label + ' (Ctrl+B)';
+}
+
+document.addEventListener('DOMContentLoaded', updateSidebarToggleUI);
+
+// Raccourci Ctrl+B (hors champs de saisie)
+document.addEventListener('keydown', function (e) {
+	if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b') {
+		const t = e.target;
+		if (t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName)))
+			return;
+		e.preventDefault();
+		toggleSidebar();
+	}
+});
+
 function toggleSubmenu(el) {
 	const navItem = el.closest('.nav-item');
 	if (navItem) 
