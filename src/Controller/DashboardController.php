@@ -25,14 +25,14 @@ class DashboardController extends AbstractController
         $totalDetailants = $em->getRepository(Detailant::class)->count(['statut' => 'ACTIF']);
         $totalCommandes = $em->getRepository(Commande::class)->count([]);
         $totalProductions = $em->getRepository(Production::class)->count(['statut' => 'VALIDEE']);
-        $livraisonsEnCours = $em->getRepository(Livraison::class)->count(['statut' => ['PREPARATION', 'EXPEDIEE', 'EN_TRANSIT']]);
+        $livraisonsEnCours = $em->getRepository(Livraison::class)->count(['statut' => Livraison::STATUTS_EN_COURS]);
 
         // Chiffre d'affaires : somme calculée par la base
         $chiffreAffaires = (float) $em->createQueryBuilder()
             ->select('COALESCE(SUM(c.montantTotal), 0)')
             ->from(Commande::class, 'c')
             ->where('c.statut IN (:statuts)')
-            ->setParameter('statuts', ['VALIDEE', 'EXPEDIEE', 'LIVREE', 'RECEPTIONNEE'])
+            ->setParameter('statuts', Commande::STATUTS_CHIFFRE_AFFAIRES)
             ->getQuery()->getSingleScalarResult();
 
         // Clients chargés dans la même requête (le nom du client est affiché sur chaque ligne)

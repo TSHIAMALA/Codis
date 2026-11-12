@@ -4,35 +4,43 @@
 {% block page_subtitle %}Indicateurs clés de performance industrielle, commerciale et logistique par région{% endblock %}
 
 {% block body %}
-<!-- Top Key KPI Stats Cards -->
+<!-- Top Key KPI Stats Cards : chaque carte ouvre le détail correspondant (si l'utilisateur a accès à la page) -->
+{% set lienCa = is_granted('ROLE_AGENT_COMMERCIAL') ? path('app_commande_index', {statut: 'CHIFFRE_AFFAIRES'}) : null %}
+{% set lienStock = path('app_stock_index', {tab: 'synthese'}) %}
+{% set lienPartenaires = is_granted('ROLE_DELEGUE') ? path('app_commercial_index', {tab: 'grossistes'}) : null %}
+{% set lienLivraisons = is_granted('ROLE_GESTIONNAIRE_DEPOT') ? path('app_livraison_index', {statut: 'EN_COURS'}) : null %}
 <div class="grid-stats">
-    <div class="card-stat">
+    <{{ lienCa ? 'a' : 'div' }} class="card-stat{{ lienCa ? ' card-stat-link' }}"{% if lienCa %} href="{{ lienCa }}" title="Voir les commandes comptées dans le chiffre d'affaires"{% endif %}>
         <div class="stat-label">Chiffre d'Affaires</div>
         <div class="stat-value">{{ chiffreAffaires|number_format(2, ',', ' ') }} $</div>
         <span class="badge badge-success"><i class="fa-solid fa-arrow-trend-up" style="font-size: 10px;"></i> Réseau actif</span>
         <i class="fa-solid fa-wallet stat-icon"></i>
-    </div>
+        {% if lienCa %}<span class="stat-link-hint">Voir le détail <i class="fa-solid fa-arrow-right"></i></span>{% endif %}
+    </{{ lienCa ? 'a' : 'div' }}>
 
-    <div class="card-stat">
+    <a class="card-stat card-stat-link" href="{{ lienStock }}" title="Voir la synthèse des stocks par produit">
         <div class="stat-label">Stock Total Consolidé</div>
         <div class="stat-value text-gold">{{ totalStockDisponible|number_format(0, ',', ' ') }} <span style="font-size: 14px; font-weight: 500;">unités</span></div>
         <span class="badge badge-gold"><i class="fa-solid fa-boxes-stacked" style="font-size: 10px;"></i> {{ totalStockReserve|number_format(0, ',', ' ') }} réservées</span>
         <i class="fa-solid fa-warehouse stat-icon"></i>
-    </div>
+        <span class="stat-link-hint">Voir le détail <i class="fa-solid fa-arrow-right"></i></span>
+    </a>
 
-    <div class="card-stat">
+    <{{ lienPartenaires ? 'a' : 'div' }} class="card-stat{{ lienPartenaires ? ' card-stat-link' }}"{% if lienPartenaires %} href="{{ lienPartenaires }}" title="Voir les grossistes et distributeurs"{% endif %}>
         <div class="stat-label">Partenaires Commerciaux</div>
         <div class="stat-value">{{ totalGrossistes }}</div>
         <span class="badge badge-info">{{ totalDetailants }} Points de vente</span>
         <i class="fa-solid fa-shop stat-icon"></i>
-    </div>
+        {% if lienPartenaires %}<span class="stat-link-hint">Voir le détail <i class="fa-solid fa-arrow-right"></i></span>{% endif %}
+    </{{ lienPartenaires ? 'a' : 'div' }}>
 
-    <div class="card-stat">
+    <{{ lienLivraisons ? 'a' : 'div' }} class="card-stat{{ lienLivraisons ? ' card-stat-link' }}"{% if lienLivraisons %} href="{{ lienLivraisons }}" title="Voir les livraisons en préparation et en transit"{% endif %}>
         <div class="stat-label">Livraisons & Transit</div>
         <div class="stat-value">{{ livraisonsEnCours }}</div>
         <span class="badge badge-warning"><i class="fa-solid fa-truck" style="font-size: 10px;"></i> En cours d'expédition</span>
         <i class="fa-solid fa-truck-moving stat-icon"></i>
-    </div>
+        {% if lienLivraisons %}<span class="stat-link-hint">Voir le détail <i class="fa-solid fa-arrow-right"></i></span>{% endif %}
+    </{{ lienLivraisons ? 'a' : 'div' }}>
 </div>
 
 <!-- Niveaux de Stocks par Région / Territoire -->

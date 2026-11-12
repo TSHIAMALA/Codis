@@ -40,7 +40,9 @@ class CommandeController extends AbstractController
             $qb->andWhere('c.numero LIKE :q OR g.raisonSociale LIKE :q OR d.nom LIKE :q')->setParameter('q', '%' . $recherche . '%');
         }
         if ($statut = $request->query->get('statut')) {
-            $qb->andWhere('c.statut = :statut')->setParameter('statut', $statut);
+            $statut === 'CHIFFRE_AFFAIRES'
+                ? $qb->andWhere('c.statut IN (:statuts)')->setParameter('statuts', Commande::STATUTS_CHIFFRE_AFFAIRES)
+                : $qb->andWhere('c.statut = :statut')->setParameter('statut', $statut);
         }
         $commandes = Page::depuisRequete($qb, $request);
         $grossistes = $em->getRepository(Grossiste::class)->findBy(['statut' => 'ACTIF']);

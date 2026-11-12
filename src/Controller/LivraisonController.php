@@ -36,7 +36,9 @@ class LivraisonController extends AbstractController
             ->leftJoin('li.conditionnement', 'cond')
             ->orderBy('l.id', 'DESC');
         if ($statut = $request->query->get('statut')) {
-            $qb->andWhere('l.statut = :statut')->setParameter('statut', $statut);
+            $statut === 'EN_COURS'
+                ? $qb->andWhere('l.statut IN (:statuts)')->setParameter('statuts', Livraison::STATUTS_EN_COURS)
+                : $qb->andWhere('l.statut = :statut')->setParameter('statut', $statut);
         }
         $livraisons = Page::depuisRequete($qb, $request, jointureCollection: true);
 

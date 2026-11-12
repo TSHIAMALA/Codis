@@ -17,7 +17,7 @@
         <input type="search" name="q" value="{{ app.request.query.get('q') }}" class="form-control" placeholder="N° de commande ou client…" aria-label="Rechercher une commande">
         <select name="statut" class="form-select" onchange="this.form.submit()" aria-label="Filtrer par statut">
             <option value="">Tous les statuts</option>
-            {% for code, libelle in {SOUMISE: 'En attente validation', VALIDEE: 'Validée', EXPEDIEE: 'Expédiée', RECEPTIONNEE: 'Réceptionnée', ANNULEE: 'Annulée'} %}
+            {% for code, libelle in {CHIFFRE_AFFAIRES: 'Comptées dans le chiffre d\'affaires', SOUMISE: 'En attente validation', VALIDEE: 'Validée', EXPEDIEE: 'Expédiée', RECEPTIONNEE: 'Réceptionnée', ANNULEE: 'Annulée'} %}
                 <option value="{{ code }}" {% if app.request.query.get('statut') == code %}selected{% endif %}>{{ libelle }}</option>
             {% endfor %}
         </select>

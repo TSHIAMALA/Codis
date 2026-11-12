@@ -11,6 +11,9 @@ use Doctrine\Common\Collections\Collection;
 #[ORM\Index(name: 'idx_livraison_statut', columns: ['statut'])]
 class Livraison
 {
+    /** Livraisons « en cours » : compteur du tableau de bord et filtre EN_COURS de la liste. */
+    public const STATUTS_EN_COURS = ['PREPARATION', 'EXPEDIEE', 'EN_TRANSIT'];
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'bigint', options: ['unsigned' => true])]

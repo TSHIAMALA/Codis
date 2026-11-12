@@ -572,6 +572,44 @@ main.main-content {
 	opacity: 1;
 }
 
+/* Carte cliquable : ouvre le détail correspondant */
+a.card-stat-link {
+	display: block;
+	color: inherit;
+	text-decoration: none;
+	cursor: pointer;
+}
+
+a.card-stat-link:focus-visible {
+	outline: 2px solid var(--gold);
+	outline-offset: 2px;
+}
+
+.card-stat .stat-link-hint {
+	position: absolute;
+	right: 20px;
+	bottom: 18px;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--gold);
+	opacity: 0;
+	transform: translateX(-4px);
+	transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+a.card-stat-link:hover .stat-link-hint,
+a.card-stat-link:focus-visible .stat-link-hint {
+	opacity: 1;
+	transform: translateX(0);
+}
+
+@media (hover: none) {
+	.card-stat .stat-link-hint {
+		opacity: 1;
+		transform: none;
+	}
+}
+
 .card-stat .stat-label {
 	font-size: 12px;
 	font-weight: 600;

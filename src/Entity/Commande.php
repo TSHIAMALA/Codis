@@ -12,6 +12,9 @@ use Doctrine\Common\Collections\Collection;
 #[ORM\Index(name: 'idx_commande_statut', columns: ['statut'])]
 class Commande
 {
+    /** Commandes comptées dans le chiffre d'affaires : tableau de bord et filtre CHIFFRE_AFFAIRES de la liste. */
+    public const STATUTS_CHIFFRE_AFFAIRES = ['VALIDEE', 'EXPEDIEE', 'LIVREE', 'RECEPTIONNEE'];
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'bigint', options: ['unsigned' => true])]
