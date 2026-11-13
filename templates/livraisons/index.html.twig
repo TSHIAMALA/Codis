@@ -78,6 +78,7 @@
                     {% endif %}
                 </td>
                 <td style="text-align: right; white-space: nowrap;">
+                    <a href="{{ path('app_livraison_imprimer', {id: l.id, auto: 1}) }}" target="_blank" rel="noopener" class="btn btn-outline btn-sm" title="Imprimer le BL / Enregistrer en PDF"><i class="fa-solid fa-print"></i></a>
                     {% set ctrl = controles[l.id] ?? null %}
                     {% if workflow_can(l, 'expedier') %}
                         {% if ctrl and ctrl.paiementRequis %}

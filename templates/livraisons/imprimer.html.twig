@@ -1,0 +1,197 @@
+{% set cmd = l.commande %}
+{% set client = cmd ? (cmd.grossiste ?: cmd.detailant) : null %}
+{% set statuts = {PLANIFIEE: 'Planifié', PREPARATION: 'En préparation', EXPEDIEE: 'Expédié', EN_TRANSIT: 'En transit', LIVREE: 'Livré', RECEPTION_CONFIRMEE: 'Réception confirmée', INCIDENT: 'Incident', ANNULEE: 'Annulé'} %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    {# Le titre devient le nom du fichier proposé lors de l'enregistrement en PDF #}
+    <title>{{ l.numero }}</title>
+    <link rel="icon" href="{{ asset('favicon.png') }}">
+    <style>
+        @page { size: A4; margin: 14mm 12mm; }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: #e5e7eb; color: #111827; font: 12px/1.45 "Segoe UI", Arial, sans-serif; }
+        .barre { position: sticky; top: 0; display: flex; gap: 8px; justify-content: center; padding: 10px; background: #1f2937; }
+        .barre button, .barre a { border: 0; border-radius: 6px; padding: 8px 14px; font: 600 13px "Segoe UI", Arial, sans-serif; cursor: pointer; text-decoration: none; }
+        .barre .principal { background: #c9a227; color: #111827; }
+        .barre .secondaire { background: #374151; color: #f9fafb; }
+        .feuille { position: relative; width: 210mm; min-height: 297mm; margin: 16px auto; padding: 14mm 12mm; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,.15); }
+
+        .entete { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #c9a227; padding-bottom: 12px; }
+        .marque { display: flex; gap: 10px; align-items: center; }
+        .marque img { height: 52px; }
+        .marque .nom { font-size: 20px; font-weight: 800; letter-spacing: .5px; }
+        .marque .sous { color: #6b7280; font-size: 11px; }
+        .titre { text-align: right; }
+        .titre h1 { margin: 0; font-size: 18px; text-transform: uppercase; letter-spacing: 1px; }
+        .titre .numero { font-size: 15px; font-weight: 700; color: #92400e; }
+        .titre .statut { display: inline-block; margin-top: 4px; padding: 2px 8px; border: 1px solid #9ca3af; border-radius: 10px; font-size: 10px; text-transform: uppercase; }
+
+        .blocs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0; }
+        .bloc { border: 1px solid #d1d5db; border-radius: 6px; padding: 8px 10px; }
+        .bloc h2 { margin: 0 0 4px; font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: #6b7280; }
+        .bloc .principal { font-size: 13px; font-weight: 700; }
+        .infos { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid #d1d5db; border-radius: 6px; margin-bottom: 14px; }
+        .infos div { padding: 6px 10px; border-right: 1px solid #e5e7eb; }
+        .infos div:last-child { border-right: 0; }
+        .infos span { display: block; font-size: 10px; text-transform: uppercase; color: #6b7280; }
+        .infos strong { font-size: 12px; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f3f4f6; font-size: 10px; text-transform: uppercase; letter-spacing: .4px; text-align: left; padding: 6px 8px; border: 1px solid #d1d5db; }
+        td { padding: 6px 8px; border: 1px solid #d1d5db; vertical-align: top; }
+        td.nombre, th.nombre { text-align: right; white-space: nowrap; }
+        td.vide { height: 22px; }
+        .lot { display: block; color: #4b5563; font-size: 11px; }
+        tfoot td { font-weight: 700; background: #f9fafb; }
+
+        .observation { margin-top: 12px; padding: 8px 10px; border-left: 3px solid #c9a227; background: #fffbeb; }
+        .signatures { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 24px; page-break-inside: avoid; }
+        .signatures div { border: 1px solid #d1d5db; border-radius: 6px; padding: 8px 10px; height: 92px; }
+        .signatures strong { display: block; font-size: 11px; }
+        .signatures span { font-size: 10px; color: #6b7280; }
+        .reserves { margin-top: 12px; border: 1px dashed #9ca3af; border-radius: 6px; padding: 8px 10px; height: 60px; color: #6b7280; font-size: 10px; page-break-inside: avoid; }
+        .pied { margin-top: 16px; display: flex; justify-content: space-between; color: #9ca3af; font-size: 9.5px; }
+        .filigrane { position: absolute; top: 40%; left: 0; right: 0; text-align: center; font-size: 110px; font-weight: 900; color: rgba(220, 38, 38, .12); transform: rotate(-28deg); pointer-events: none; }
+
+        @media print {
+            body { background: #fff; }
+            .barre { display: none; }
+            .feuille { width: auto; min-height: 0; margin: 0; padding: 0; box-shadow: none; }
+            th, tfoot td, .observation, .titre .statut { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+        @media screen and (max-width: 800px) {
+            .feuille { width: auto; min-height: 0; margin: 8px; padding: 16px; }
+            .blocs, .infos, .signatures { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="barre">
+        <button type="button" class="principal" onclick="window.print()">Imprimer / Enregistrer en PDF</button>
+        <a class="secondaire" href="{{ path('app_livraison_index') }}">Retour aux livraisons</a>
+    </div>
+
+    <div class="feuille">
+        {% if l.statut == 'ANNULEE' %}<div class="filigrane">ANNULÉ</div>{% endif %}
+
+        <div class="entete">
+            <div class="marque">
+                <img src="{{ asset('images/logo.png') }}" alt="">
+                <div>
+                    <div class="nom">CODIS</div>
+                    <div class="sous">Colonne Distribution</div>
+                </div>
+            </div>
+            <div class="titre">
+                <h1>Bon de livraison</h1>
+                <div class="numero">{{ l.numero }}</div>
+                <div class="statut">{{ statuts[l.statut] ?? l.statut }}</div>
+            </div>
+        </div>
+
+        <div class="blocs">
+            <div class="bloc">
+                <h2>Expéditeur — dépôt</h2>
+                {% if l.depot %}
+                    <div class="principal">{{ l.depot.nom }}</div>
+                    {% if l.depot.adresse %}<div>{{ l.depot.adresse }}</div>{% endif %}
+                    <div>{{ [l.depot.ville ? l.depot.ville.nom, l.depot.region ? l.depot.region.nom, l.depot.pays ? l.depot.pays.nom]|filter(v => v)|join(' — ') }}</div>
+                {% else %}
+                    <div>—</div>
+                {% endif %}
+            </div>
+            <div class="bloc">
+                <h2>Destinataire</h2>
+                <div class="principal">{{ cmd ? cmd.clientNom : '—' }}</div>
+                {% if client %}
+                    {% if client.code %}<div>Code client : {{ client.code }}</div>{% endif %}
+                    {% if client.nomResponsable %}<div>Responsable : {{ client.nomResponsable }}</div>{% endif %}
+                    {% if client.adresse %}<div>{{ client.adresse }}</div>{% endif %}
+                    <div>{{ [client.ville ? client.ville.nom, client.region ? client.region.nom, client.pays ? client.pays.nom]|filter(v => v)|join(' — ') }}</div>
+                    {% if client.telephone %}<div>Tél. : {{ client.telephone }}</div>{% endif %}
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="infos">
+            <div><span>Commande</span><strong>{{ cmd ? cmd.numero : '—' }}</strong></div>
+            <div><span>Date de commande</span><strong>{{ cmd and cmd.dateCommande ? cmd.dateCommande|date('d/m/Y') : '—' }}</strong></div>
+            <div><span>Date prévue</span><strong>{{ l.datePrevue ? l.datePrevue|date('d/m/Y') : '—' }}</strong></div>
+            <div><span>Date d'expédition</span><strong>{{ l.dateDepart ? l.dateDepart|date('d/m/Y H:i') : '—' }}</strong></div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 32px;">#</th>
+                    <th>Produit</th>
+                    <th>Conditionnement</th>
+                    <th class="nombre">Qté prévue</th>
+                    <th class="nombre">Qté livrée</th>
+                    <th class="nombre" style="width: 90px;">Qté reçue</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% set totalPrevu = 0 %}
+                {% set totalLivre = 0 %}
+                {% for ligne in l.lignes %}
+                    {% set totalPrevu = totalPrevu + ligne.quantitePrevue %}
+                    {% set totalLivre = totalLivre + ligne.quantiteLivree %}
+                    {% set lotsLigne = lots[ligne.produit.id ~ '-' ~ (ligne.conditionnement ? ligne.conditionnement.id)] ?? [] %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>
+                            <strong>{{ ligne.produit.nom }}</strong>{% if ligne.produit.code %} <span style="color:#6b7280;">({{ ligne.produit.code }})</span>{% endif %}
+                            {% if lotsLigne is not empty %}
+                                {% for lot in lotsLigne %}
+                                    <span class="lot">Lot {{ lot.numero }}{% if lot.expiration %} — exp. {{ lot.expiration|date('d/m/Y') }}{% endif %}{% if lotsLigne|length > 1 %} : {{ lot.quantite|number_format(0, ',', ' ') }}{% endif %}</span>
+                                {% endfor %}
+                            {% elseif ligne.lot %}
+                                <span class="lot">Lot {{ ligne.lot.numeroLot }}{% if ligne.lot.dateExpiration %} — exp. {{ ligne.lot.dateExpiration|date('d/m/Y') }}{% endif %}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ ligne.conditionnement ? ligne.conditionnement.libelle : '—' }}</td>
+                        <td class="nombre">{{ ligne.quantitePrevue|number_format(0, ',', ' ') }}</td>
+                        <td class="nombre">{{ ligne.quantiteLivree|number_format(0, ',', ' ') }}</td>
+                        <td class="vide"></td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="6" style="text-align:center; color:#6b7280;">Aucune ligne sur ce bon de livraison.</td></tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="3">Total</td>
+                    <td class="nombre">{{ totalPrevu|number_format(0, ',', ' ') }}</td>
+                    <td class="nombre">{{ totalLivre|number_format(0, ',', ' ') }}</td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+
+        {% if l.observation %}
+            <div class="observation"><strong>Observations :</strong> {{ l.observation }}</div>
+        {% endif %}
+
+        <div class="reserves">Réserves à la réception (manquants, casse, avaries) :</div>
+
+        <div class="signatures">
+            <div><strong>Le magasinier (dépôt)</strong><span>Nom, date et signature</span></div>
+            <div><strong>Le transporteur / chauffeur</strong><span>Nom, date et signature</span></div>
+            <div><strong>Le client (réception)</strong><span>Nom, date, signature et cachet</span></div>
+        </div>
+
+        <div class="pied">
+            <span>CODIS — {{ l.numero }}</span>
+            <span>Imprimé le {{ 'now'|date('d/m/Y à H:i') }} par {{ app.user ? app.user.nomComplet : '' }}</span>
+        </div>
+    </div>
+
+    {% if app.request.query.get('auto') %}
+        <script>window.addEventListener('load', () => window.print());</script>
+    {% endif %}
+</body>
+</html>

@@ -160,6 +160,34 @@ class CommandeLivraisonTest extends AppWebTestCase
         self::assertStringContainsString('doit être supérieur à zéro', $message);
     }
 
+    public function testImpressionDuBonDeLivraison(): void
+    {
+        $this->loginAs(AppFixtures::ADMIN);
+        $commande = $this->creerCommande(AppFixtures::GROSSISTE_SECTEUR, AppFixtures::PRODUIT_A, 1);
+        $this->poster('/commandes/' . $commande->getId() . '/valider', [], '/commandes');
+        $bl = $this->livraisonActive($commande);
+        $this->poster('/livraisons/' . $bl->getId() . '/expedier', [], '/livraisons');
+
+        // Le bouton d'impression est proposé dans la liste
+        $this->client->request('GET', '/livraisons');
+        self::assertSelectorExists('a[href="/livraisons/' . $bl->getId() . '/imprimer?auto=1"]');
+
+        $crawler = $this->client->request('GET', '/livraisons/' . $bl->getId() . '/imprimer');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('title', $bl->getNumero());
+        self::assertSelectorTextContains('.blocs', $commande->getClientNom());
+        self::assertSelectorTextContains('.infos', $commande->getNumero());
+        self::assertSame(1, $crawler->filter('tbody tr')->count());
+        // Le lot prélevé à l'expédition est tracé sur le document
+        self::assertSelectorExists('tbody .lot');
+        self::assertSelectorNotExists('.filigrane');
+
+        // Réservé aux gestionnaires de dépôt
+        $this->loginAs(AppFixtures::CAISSIER);
+        $this->client->request('GET', '/livraisons/' . $bl->getId() . '/imprimer');
+        self::assertResponseStatusCodeSame(403);
+    }
+
     private function livraisonActive(Commande $commande): Livraison
     {
         $this->em()->clear();

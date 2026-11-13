@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\EmplacementStock;
 use App\Entity\Livraison;
+use App\Entity\MouvementStock;
 use App\Exception\OperationImpossibleException;
 use App\Pagination\Page;
 use App\Service\LivraisonService;
@@ -73,6 +74,30 @@ class LivraisonController extends AbstractController
         return $this->render('livraisons/index.html.twig', [
             'livraisons' => $livraisons,
             'controles' => $controles,
+        ]);
+    }
+
+    /** Bon de livraison au format A4, à imprimer ou à enregistrer en PDF depuis le navigateur. */
+    #[Route('/{id}/imprimer', name: 'app_livraison_imprimer', requirements: ['id' => '\d+'], methods: ['GET'])]
+    public function imprimer(Livraison $livraison, EntityManagerInterface $em): Response
+    {
+        // Lots réellement prélevés à l'expédition (une ligne peut couvrir plusieurs lots)
+        $lots = [];
+        $mouvements = $em->getRepository(MouvementStock::class)->findBy(
+            ['referenceType' => LivraisonService::REF_LIVRAISON, 'referenceId' => $livraison->getId(), 'typeMouvement' => 'VENTE'],
+            ['id' => 'ASC']
+        );
+        foreach ($mouvements as $m) {
+            if (!$m->getLot()) {
+                continue;
+            }
+            $cle = $m->getProduit()->getId() . '-' . $m->getConditionnement()?->getId();
+            $lots[$cle][] = ['numero' => $m->getLot()->getNumeroLot(), 'expiration' => $m->getLot()->getDateExpiration(), 'quantite' => (float) $m->getQuantite()];
+        }
+
+        return $this->render('livraisons/imprimer.html.twig', [
+            'l' => $livraison,
+            'lots' => $lots,
         ]);
     }
 

@@ -192,6 +192,9 @@
                     {% endif %}
                 </td>
                 <td style="text-align: right;">
+                    {% if is_granted('ROLE_GESTIONNAIRE_DEPOT') %}
+                        <a href="{{ path('app_livraison_imprimer', {id: l.id, auto: 1}) }}" target="_blank" rel="noopener" class="btn btn-outline btn-sm" title="Imprimer le BL / Enregistrer en PDF"><i class="fa-solid fa-print"></i></a>
+                    {% endif %}
                     {% if workflow_can(l, 'expedier') and is_granted('ROLE_GESTIONNAIRE_DEPOT') %}
                         {% if isDistAgree and not estPaye %}
                             <a href="{{ is_granted('ROLE_CAISSIER') ? path('app_paiement_index') : '#' }}" class="btn btn-warning btn-sm" title="Paiement requis avant expédition"><i class="fa-solid fa-lock"></i> Paiement Caisse Requis</a>
